@@ -2,7 +2,7 @@
 
 이것저것 만들어보는 공간입니다. 디놈들이 심심해서 만든 토큰 낭비 시리즈-
 
-![화면 위를 떠다니는 Clawd 세 마리](docs/screenshot.png)
+![화면 위를 떠다니는 Clawd 여섯 마리. 일하는 녀석, 시계 든 녀석, 완료 말풍선](docs/preview.gif)
 
 Claude Code의 픽셀 마스코트 **Clawd**를 맥 화면에 풀어놓는 작은 앱입니다.
 Claude가 쉬면 Clawd도 놀고, Claude가 일하면 Clawd도 일합니다.
