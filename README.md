@@ -142,7 +142,12 @@ Touch Bar 전체를 덮을 때는 오른쪽에 **밝기 −/+ · 음소거 · �
 코드는 GitHub 비공개 저장소로 공유합니다. 각자 자기 맥에 받아서 자기 Claude와 작업하고, 바뀐 내용을 GitHub로 주고받습니다.
 
 1. **처음 한 번 (공유하는 사람)**: [GitHub Desktop](https://desktop.github.com)에 로그인 → File → Add Local Repository → 이 폴더 선택 → 저장소 만들기 → Publish repository (**Keep this code private** 체크) → github.com의 저장소 Settings → Collaborators에서 동료 초대
-2. **처음 한 번 (동료)**: 초대 수락 → GitHub Desktop에서 Clone → `./install.sh`
+2. **처음 한 번 (동료)**: 초대 메일에서 수락 → 터미널에서 아래 명령 (또는 GitHub Desktop에서 Clone 후 `./install.sh`)
+
+   ```bash
+   xcode-select --install   # 개발 도구가 없을 때만
+   git clone https://github.com/suinegyzal/clawd-touchbar.git ~/Documents/ClaudeTouchBar && cd ~/Documents/ClaudeTouchBar && ./install.sh
+   ```
 3. **평소**: 작업 시작 전에 **Fetch/Pull**로 동료 변경을 받고, 작은 단위로 자주 **Commit → Push** 합니다.
 
 같이 작업할 때 요령:
