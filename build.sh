@@ -32,6 +32,7 @@ fi
 # 앱이 첫 실행 때 ~/.clawd-touchbar/bin 으로 복사해 Claude Code에 연결하는 훅 스크립트
 cp hooks/clawd-hook.sh hooks/clawd-statusline.sh "$APP/Contents/Resources/hooks/"
 chmod +x "$APP/Contents/Resources/hooks/"*.sh
+cp icon/AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"
 
 cat > "$APP/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
@@ -43,6 +44,7 @@ cat > "$APP/Contents/Info.plist" <<PLIST
   <key>CFBundleIdentifier</key><string>com.local.ClawdTouchBar</string>
   <key>CFBundleExecutable</key><string>ClawdTouchBar</string>
   <key>CFBundlePackageType</key><string>APPL</string>
+  <key>CFBundleIconFile</key><string>AppIcon</string>
   <key>CFBundleShortVersionString</key><string>${VERSION}</string>
   <key>CFBundleVersion</key><string>${VERSION}</string>
   <key>LSMinimumSystemVersion</key><string>12.0</string>

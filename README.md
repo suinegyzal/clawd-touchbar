@@ -9,6 +9,8 @@ Claude가 쉬면 Clawd도 놀고, Claude가 일하면 Clawd도 일합니다. Tou
   ▘▘ ▝▝
 ```
 
+개인이 취미로 만든 비공식 팬 프로젝트입니다. Anthropic과는 관계가 없고, Claude와 Clawd는 Anthropic의 상표·캐릭터입니다. 상업적 용도로 쓰지 않습니다.
+
 ---
 
 ## 내려받아 설치하기 (1분)
