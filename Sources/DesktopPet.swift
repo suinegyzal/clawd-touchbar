@@ -18,6 +18,12 @@ final class PetWindow: NSObject {
     private var bob = Double.random(in: 0...6)
     private var heldMouseY: CGFloat?
     private var cursorAwayFor = 10.0
+    private var lastMouseX: CGFloat?
+    private var shakeDir: CGFloat = 0
+    private var shakeCount = 0
+    private var shakeTimer = 0.0
+    private var announceFor = 0.0
+    var lastGreet: CFTimeInterval = 0
 
     /// 메뉴의 "한 마리 더" / "보내기"
     var onAddPet: (() -> Void)?
@@ -78,6 +84,36 @@ final class PetWindow: NSObject {
         bye.target = self
         bye.isEnabled = onRemovePet != nil
         NSMenu.popUpContextMenu(menu, with: event, for: view)
+    }
+
+    /// 들고 좌우로 세게 흔들면(1초 안에 방향 전환 5번) 어지러워한다
+    private func trackShake(_ mouseX: CGFloat, dt: Double) {
+        defer { lastMouseX = mouseX }
+        shakeTimer -= dt
+        if shakeTimer <= 0 { shakeCount = 0; shakeDir = 0 }
+        guard let last = lastMouseX else { return }
+        let dx = mouseX - last
+        guard abs(dx) > 5 else { return }
+        let dir: CGFloat = dx > 0 ? 1 : -1
+        if shakeDir != 0 && dir != shakeDir {
+            shakeCount += 1
+            shakeTimer = 1.0
+            if shakeCount >= 5 {
+                pet.dizzy(in: world)
+                shakeCount = 0
+            }
+        }
+        shakeDir = dir
+    }
+
+    /// 화면에서 Clawd가 있는 자리
+    var screenCenter: NSPoint { NSPoint(x: window.frame.midX, y: window.frame.minY + world.spriteHeight / 2) }
+
+    /// 다른 Clawd가 옆에 오면 그쪽을 보며 손을 흔든다
+    func greet(toward dx: CGFloat) {
+        pet.look = dx > 0 ? 1 : -1
+        pet.wave()
+        lastGreet = CACurrentMediaTime()
     }
 
     /// 간식은 Clawd 옆 조금 떨어진 곳에 떨어뜨려서 달려가 먹게 한다
@@ -141,8 +177,22 @@ final class PetWindow: NSObject {
             let mouseY = NSEvent.mouseLocation.y
             if let last = heldMouseY { frame.origin.y += mouseY - last }
             heldMouseY = mouseY
+            trackShake(NSEvent.mouseLocation.x, dt: Double(dt))
         } else {
             heldMouseY = nil
+            lastMouseX = nil
+            shakeCount = 0
+        }
+        // 완료 알림을 한참 안 보면 커서 옆까지 찾아온다
+        announceFor = pet.activity == .announce ? announceFor + Double(dt) : 0
+        if announceFor > 45 {
+            let mouse = NSEvent.mouseLocation
+            let side: CGFloat = mouse.x > frame.midX ? -1 : 1
+            let wantX = mouse.x - frame.width / 2 + side * 170
+            let wantY = mouse.y - frame.height / 2
+            frame.origin.x += (wantX - frame.origin.x) * min(1, 1.2 * dt)
+            frame.origin.y += (wantY - frame.origin.y) * min(1, 1.2 * dt)
+            pet.look = side > 0 ? -1 : 1
         }
         // 마우스가 다가오면 쳐다보고, 오랜만이면 손을 흔든다
         let mouse = NSEvent.mouseLocation

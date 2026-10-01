@@ -271,6 +271,8 @@ final class PlaygroundView: NSView {
         weak var pet: Clawd?
         let startX: CGFloat
         var dragging = false
+        let since = CACurrentMediaTime()
+        var nextPat = CACurrentMediaTime() + 0.5   // 0.5초 넘게 누르고 있으면 쓰다듬기 시작
     }
     private var grips: [AnyHashable: Grip] = [:]
 
@@ -344,6 +346,14 @@ final class PlaygroundView: NSView {
         lastTick = now
         if bounds.width > 40 { world.width = bounds.width }
         world.update(dt)
+        // 끌지 않고 꾹 누르고 있으면 계속 쓰다듬는다 (하트가 연달아)
+        for (key, grip) in grips where !grip.dragging && now >= grip.nextPat {
+            guard let pet = grip.pet else { continue }
+            pet.pat(in: world)
+            var g = grip
+            g.nextPat = now + 0.45
+            grips[key] = g
+        }
         onTick?()
         needsDisplay = true
         if world.transparent { updateClickThrough() }

@@ -79,6 +79,9 @@ final class Clawd {
     private var moodIn = 0.0
     private var attentionIn = 0.0
     private var grumble: String?
+    private var dizzyFor = 0.0
+    private var dizzyStarIn = 0.0
+    private var yawnFor = 0.0
     private var grumbleFor = 0.0
     private var moving = false
     private var legPeriod = 0.08
@@ -115,6 +118,17 @@ final class Clawd {
         happyFor = max(0, happyFor - dt)
         grumbleFor = max(0, grumbleFor - dt)
         tickBlink(dt)
+        yawnFor = max(0, yawnFor - dt)
+        if dizzyFor > 0 {
+            dizzyFor -= dt
+            dizzyStarIn -= dt
+            if dizzyStarIn <= 0 {
+                dizzyStarIn = 0.35
+                let side: CGFloat = Bool.random() ? 1 : -1
+                world.emit(.text("✦", NSColor(cgColor: Palette.treat)!, 8), x: x + side * world.px * 5, y: world.spriteHeight + world.px,
+                           vx: -side * 14, vy: 10, life: 0.9)
+            }
+        }
 
         if activity == .held { return }
 
@@ -233,6 +247,7 @@ final class Clawd {
 
     /// 폭발 직전엔 가끔 부들부들 떤다
     var shake: CGFloat {
+        if dizzyFor > 0 { return CGFloat(sin(clock * 18)) * 1.5 }
         guard mood == .furious, clock.truncatingRemainder(dividingBy: 2.5) < 0.6 else { return 0 }
         return Int(clock / 0.05) % 2 == 0 ? 0.5 : -0.5
     }
@@ -331,7 +346,12 @@ final class Clawd {
             pickDirection(world)
             return
         }
-        let sleepy = min(0.55, 0.06 + world.idleSeconds / 1500) * (1 - world.busy)
+        if dizzyFor > 0 {
+            begin(.idle, for: 0.5...1)
+            return
+        }
+        var sleepy = min(0.55, 0.06 + world.idleSeconds / 1500) * (1 - world.busy)
+        if Self.isNight { sleepy = max(sleepy, 0.45) }   // 밤 11시 넘으면 금방 졸린다
         if Double.random(in: 0..<1) < sleepy {
             begin(.sleep, for: 8...16)
             zIn = 0.4
@@ -348,6 +368,19 @@ final class Clawd {
         default: begin(.hop, for: 1.2...2.5)
         }
         if [.walk, .run, .hop].contains(next) { pickDirection(world) } else { look = 0 }
+        if Self.isNight && (next == .idle || next == .rest) && Double.random(in: 0..<1) < 0.5 { yawn(world) }
+    }
+
+    /// 밤 11시 ~ 아침 6시
+    static var isNight: Bool {
+        let hour = Calendar.current.component(.hour, from: Date())
+        return hour >= 23 || hour < 6
+    }
+
+    private func yawn(_ world: Playground) {
+        yawnFor = 1.3
+        world.emit(.text("하암…", Palette.text, 8), x: x + facing * world.px * 7, y: world.spriteHeight - world.px * 3,
+                   vx: facing * 4, vy: 7, life: 1.4)
     }
 
     private func pickDirection(_ world: Playground) {
@@ -372,6 +405,9 @@ final class Clawd {
             world.puffDust(at: x)
             if job != nil {
                 applyJob(world)
+            } else if dizzyFor > 0 {
+                begin(.idle, for: dizzyFor...dizzyFor)
+                look = 0
             } else {
                 begin(.idle, for: 0.5...0.9)
                 look = 0
@@ -571,6 +607,15 @@ final class Clawd {
         begin(.cheer, for: 0.8...1.1)
     }
 
+    /// 들고 세게 흔들면 어지러워한다 (내려놓은 뒤에도 잠깐 비틀거린다)
+    func dizzy(in world: Playground) {
+        guard dizzyFor <= 0 else { return }
+        dizzyFor = 2.8
+        dizzyStarIn = 0
+        happyFor = 0
+        exclaim("@", in: world)
+    }
+
     /// 쓰다듬기: 뛰지 않고 좋아하기만 한다 (자고 있어도 깨우지 않는다)
     func pat(in world: Playground) {
         guard activity != .held, activity != .fall else { return }
@@ -684,10 +729,21 @@ final class Clawd {
             f.armsUp = true
             f.prop = .holdSign
         }
+        if dizzyFor > 0 {
+            // 빙글빙글: > < 와 감은 눈을 번갈아, 고개도 좌우로
+            f.eyes = Int(clock / 0.14) % 2 == 0 ? .frustrated : .closed
+            f.look = Int(clock / 0.28) % 2 == 0 ? -1 : 1
+            return f
+        }
+        if yawnFor > 0 {
+            f.eyes = .closed
+            return f
+        }
         if happyFor > 0 || activity == .announce {
             f.eyes = .happy
             return f
         }
+        if Self.isNight && (f.eyes == .open || f.eyes == .up) && [.idle, .rest, .walk].contains(activity) { f.eyes = .tired }
         switch mood {
         case .calm:
             break

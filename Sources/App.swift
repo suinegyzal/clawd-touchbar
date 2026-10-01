@@ -215,6 +215,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTouchBarDelegate, NS
 
     // MARK: - 화면 위 모드
 
+    /// 두 마리가 가까이 지나치면 서로 인사한다 (한 쌍당 25초에 한 번)
+    private func greetNeighbors() {
+        let now = CACurrentMediaTime()
+        for i in petWindows.indices {
+            for j in petWindows.indices where j > i {
+                let a = petWindows[i], b = petWindows[j]
+                guard now - a.lastGreet > 25, now - b.lastGreet > 25 else { continue }
+                let dx = b.screenCenter.x - a.screenCenter.x
+                guard abs(dx) < 150, abs(b.screenCenter.y - a.screenCenter.y) < 90 else { continue }
+                a.greet(toward: dx)
+                b.greet(toward: -dx)
+            }
+        }
+    }
+
     private func showDesktop() {
         while petWindows.count < petCount { addPetWindow() }
     }
@@ -266,6 +281,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTouchBarDelegate, NS
             let busy = self.stats.value(for: self.runnerSource)
             self.world.busy = busy
             for w in self.petWindows { w.world.busy = busy }
+            self.greetNeighbors()
             self.metricsView.busy = busy
             self.menuBarPet?.world.busy = busy
             self.metricsView.tick()
