@@ -11,24 +11,27 @@ Claude가 쉬면 Clawd도 놀고, Claude가 일하면 Clawd도 일합니다. Tou
 
 ---
 
-## 3분 만에 시작하기
+## 내려받아 설치하기 (1분)
 
 **필요한 것**: macOS 12 이상, Claude Code(Claude 데스크톱 앱의 Code 탭 또는 터미널의 `claude`)
 
-1. 터미널을 열고 아래 명령을 붙여 넣습니다. 저장소가 비공개라면 먼저 저장소 주인에게 초대를 받아 수락해야 합니다.
+1. [Releases](https://github.com/suinegyzal/clawd-touchbar/releases/latest)에서 `ClawdTouchBar.zip`을 내려받아 풉니다.
+2. `ClawdTouchBar.app`을 **응용 프로그램** 폴더로 옮기고 엽니다.
+   - 처음 열 때 "확인되지 않은 개발자" 경고가 뜨면: **시스템 설정 → 개인정보 보호 및 보안** 맨 아래의 **그래도 열기**를 누릅니다. (macOS 14 이하는 앱을 오른쪽 클릭 → 열기로도 됩니다.) 개발자 서명 없이 배포하는 앱이라 한 번만 거치면 됩니다.
+3. "Clawd를 Claude Code와 연결할까요?" 창에서 **연결**을 누릅니다. 터미널 없이 앱이 알아서 Claude Code 설정에 훅을 넣습니다.
+4. **Claude Code 세션을 새로 시작**하면 Clawd가 Claude를 따라 일하기 시작합니다. Touch Bar가 없는 맥이면 Clawd가 화면 위를 떠다니고, 메뉴 막대에도 작은 Clawd가 돌아다닙니다.
 
-   ```bash
-   git clone https://github.com/suinegyzal/clawd-touchbar.git ~/Documents/ClaudeTouchBar && cd ~/Documents/ClaudeTouchBar && ./install.sh
-   ```
+연결이 하는 일: 내 Claude Code 설정(`~/.claude/settings.json`)에 훅과 상태줄을 추가합니다. 쓰던 다른 설정은 건드리지 않고, 바꾸기 전 원본을 `settings.json.bak-clawd`로 남깁니다. 메뉴 막대 Clawd 메뉴 → **Claude Code 연결 끊기**로 언제든 되돌립니다.
+로그인할 때 자동으로 켜려면 같은 메뉴의 **로그인할 때 자동 실행**을 켭니다.
 
-2. 개발 도구(Xcode Command Line Tools)가 없으면 설치 창이 뜹니다. **설치**를 누르고, 끝나면 `./install.sh`를 한 번 더 실행합니다.
-3. 화면 맨 위 메뉴 막대에 Clawd가 나타나면 성공입니다. **Claude Code 세션을 새로 시작**하면 Clawd가 Claude를 따라 일하기 시작합니다.
+### 소스에서 직접 빌드하기 (개발자용)
 
-`install.sh`가 하는 일:
-- 앱을 빌드해서 `~/Applications/ClawdTouchBar.app`에 넣고 실행합니다.
-- 내 Claude Code 설정(`~/.claude/settings.json`)에 훅과 상태줄을 연결합니다. 내가 쓰던 다른 설정은 건드리지 않고, 바꾸기 전 원본을 `settings.json.bak-clawd`로 남깁니다.
+```bash
+git clone https://github.com/suinegyzal/clawd-touchbar.git ~/Documents/ClaudeTouchBar && cd ~/Documents/ClaudeTouchBar && ./install.sh
+```
 
-로그인할 때 자동으로 켜려면: **시스템 설정 → 일반 → 로그인 항목 → + → 홈 폴더의 응용 프로그램 → ClawdTouchBar**
+개발 도구(Xcode Command Line Tools)가 없으면 설치 창이 뜹니다. **설치**를 누르고, 끝나면 `./install.sh`를 한 번 더 실행합니다.
+`install.sh`는 앱을 빌드해서 `~/Applications/ClawdTouchBar.app`에 넣고 실행한 뒤, Claude Code에 훅을 연결합니다.
 
 ---
 
@@ -138,6 +141,17 @@ cd ~/Documents/ClaudeTouchBar && ./uninstall.sh
 | `./install.sh`가 권한 오류를 내요 | `chmod +x install.sh uninstall.sh build.sh hooks/*.sh` 후 다시 실행하세요. |
 
 ---
+
+## 배포하기 (Release 만들기)
+
+`v`로 시작하는 태그를 올리면 GitHub Actions가 Intel + Apple Silicon 유니버설 앱을 빌드해 Release에 `ClawdTouchBar.zip`을 올립니다.
+
+```bash
+git tag v1.0.1 && git push origin v1.0.1
+```
+
+손으로 만들려면 `VERSION=1.0.1 ./build.sh universal` 뒤에 `ditto -c -k --keepParent build/ClawdTouchBar.app ClawdTouchBar.zip`.
+앱은 임시(ad-hoc) 서명만 되어 있어 처음 열 때 보안 경고가 한 번 뜹니다. Apple 개발자 계정(연 99달러)으로 Developer ID 서명과 공증을 하면 경고 없이 열립니다.
 
 ## 함께 개발하기
 

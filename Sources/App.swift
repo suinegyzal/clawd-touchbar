@@ -27,6 +27,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTouchBarDelegate, NS
         static let source = "runnerSource"
         static let menuBarPet = "menuBarPet"
         static let desktop = "desktopMode"
+        static let declined = "declinedClaudeConnect"
     }
     private static let barID = NSTouchBarItem.Identifier("com.local.ClaudeTouchBar.playground")
     private static let trayID = NSTouchBarItem.Identifier("com.local.ClaudeTouchBar.tray")
@@ -57,6 +58,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTouchBarDelegate, NS
     /// 화면 위 모드(Touch Bar 없는 맥): 떠다니는 Clawd 창들
     private var petWindows: [PetWindow] = []
     private var desktopItem: NSMenuItem!
+    private var connectItem: NSMenuItem!
+    private var loginItem: NSMenuItem!
     private var isShowing = false
     private var muteButton: NSButton?
 
@@ -131,6 +134,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTouchBarDelegate, NS
     // MARK: - 시작/종료
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        ClaudeSetup.installScripts()
+        // 처음 켤 때: Touch Bar 없는 맥이면 화면 위 모드를 기본으로
+        if defaults.object(forKey: Key.desktop) == nil { defaults.set(!ClaudeSetup.hasTouchBar, forKey: Key.desktop) }
         world.px = big ? 2 : 1.5
         world.width = barWidth
         world.setPetCount(petCount)
@@ -158,6 +164,53 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTouchBarDelegate, NS
             installTrayItem()
             showOnTouchBar()
         }
+        if !previewMode && !ClaudeSetup.isConnected && !defaults.bool(forKey: Key.declined) {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1) { [weak self] in self?.offerConnection() }
+        }
+    }
+
+    // MARK: - Claude Code 연결 (터미널 없이)
+
+    private func offerConnection() {
+        let alert = NSAlert()
+        alert.messageText = "Clawd를 Claude Code와 연결할까요?"
+        alert.informativeText = "Claude Code 설정(~/.claude/settings.json)에 훅을 추가해서, Claude가 일하면 Clawd도 따라 움직이게 해요. 쓰던 다른 설정은 건드리지 않고, 바꾸기 전 원본은 settings.json.bak-clawd 로 남겨요. 메뉴 막대의 Clawd 메뉴에서 언제든 끊을 수 있어요."
+        alert.addButton(withTitle: "연결")
+        alert.addButton(withTitle: "나중에")
+        NSApp.activate(ignoringOtherApps: true)
+        if alert.runModal() == .alertFirstButtonReturn {
+            connectClaude()
+        } else {
+            defaults.set(true, forKey: Key.declined)
+        }
+    }
+
+    private func connectClaude() {
+        let alert = NSAlert()
+        do {
+            alert.messageText = "연결 완료"
+            alert.informativeText = try ClaudeSetup.connect()
+            defaults.removeObject(forKey: Key.declined)
+        } catch {
+            alert.alertStyle = .warning
+            alert.messageText = "연결하지 못했어요"
+            alert.informativeText = "\(error.localizedDescription)\n\n~/.claude/settings.json 이 올바른 JSON인지 확인해 주세요."
+        }
+        NSApp.activate(ignoringOtherApps: true)
+        alert.runModal()
+    }
+
+    @objc private func toggleConnect() {
+        if ClaudeSetup.isConnected {
+            try? ClaudeSetup.disconnect()
+            defaults.set(true, forKey: Key.declined)
+        } else {
+            connectClaude()
+        }
+    }
+
+    @objc private func toggleLogin() {
+        ClaudeSetup.launchesAtLogin.toggle()
     }
 
     // MARK: - 화면 위 모드
@@ -385,6 +438,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTouchBarDelegate, NS
         metricsItem = menu.addItem(withTitle: "Touch Bar에 Mac 상태 보기", action: #selector(toggleMetrics), keyEquivalent: "")
         menuBarPetItem = menu.addItem(withTitle: "메뉴 막대에서 돌아다니기", action: #selector(toggleMenuBarPet), keyEquivalent: "")
         menu.addItem(.separator())
+        connectItem = menu.addItem(withTitle: "Claude Code 연결", action: #selector(toggleConnect), keyEquivalent: "")
+        loginItem = menu.addItem(withTitle: "로그인할 때 자동 실행", action: #selector(toggleLogin), keyEquivalent: "")
+        menu.addItem(.separator())
         menu.addItem(withTitle: "종료", action: #selector(quit), keyEquivalent: "q")
         for menuItem in menu.items where menuItem.action != nil { menuItem.target = self }
 
@@ -434,6 +490,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTouchBarDelegate, NS
         menuBarPetItem.state = menuBarPet?.isShowing == true ? .on : .off
         menuBarPetItem.isEnabled = menuBarPet != nil
         metricsItem.isEnabled = !previewMode
+        connectItem.title = ClaudeSetup.isConnected ? "Claude Code 연결 끊기" : "Claude Code 연결"
+        loginItem.state = ClaudeSetup.launchesAtLogin ? .on : .off
+        loginItem.isEnabled = ClaudeSetup.canAutoLaunch
     }
 
     /// 💡 아이디어 메뉴: 최근 아이디어(● = 아직 안 봄), 하나 던지기, 보고서 폴더
