@@ -87,6 +87,7 @@ final class PetWindow: NSObject {
     private var shakeCount = 0
     private var shakeTimer = 0.0
     private var announceFor = 0.0
+    private var arrivedAtCursor = false
     var lastGreet: CFTimeInterval = 0
     /// 장부 순번 (한 마리를 보내면 뒤 번호가 당겨진다)
     var slot: Int
@@ -317,7 +318,8 @@ final class PetWindow: NSObject {
         case .sleep, .rest, .think, .study, .craft, .exercise, .call, .held: still = true
         default: still = false
         }
-        if !still {
+        let cursorNear = window.frame.insetBy(dx: -80, dy: -80).contains(NSEvent.mouseLocation)
+        if !still && !cursorNear {
             frame.origin.x += driftVX * dt
             frame.origin.y += (targetY - frame.origin.y) * min(1, 0.6 * dt)
         }
@@ -335,15 +337,26 @@ final class PetWindow: NSObject {
         tickRace(&frame, dt: dt)
         tickLedger(Double(dt))
         // 완료 알림을 한참 안 보면 커서 옆까지 찾아온다
-        announceFor = pet.activity == .announce ? announceFor + Double(dt) : 0
-        if announceFor > 45 {
+        // 한 번 도착하면 더 따라가지 않고, 커서가 가까이 오면 그 자리에 멈춘다 (클릭하려는데 도망가지 않게)
+        if pet.activity == .announce {
+            announceFor += Double(dt)
+        } else {
+            announceFor = 0
+            arrivedAtCursor = false
+        }
+        if announceFor > 45 && !arrivedAtCursor && !cursorNear {
             let mouse = NSEvent.mouseLocation
-            let side: CGFloat = mouse.x > frame.midX ? -1 : 1
-            let wantX = mouse.x - frame.width / 2 + side * 170
-            let wantY = mouse.y - frame.height / 2
-            frame.origin.x += (wantX - frame.origin.x) * min(1, 1.2 * dt)
-            frame.origin.y += (wantY - frame.origin.y) * min(1, 1.2 * dt)
-            pet.look = side > 0 ? -1 : 1
+            let here = NSPoint(x: frame.minX + pet.x, y: frame.midY)
+            if abs(mouse.x - here.x) < 260 && abs(mouse.y - here.y) < 160 {
+                arrivedAtCursor = true
+            } else {
+                let side: CGFloat = mouse.x > here.x ? -1 : 1
+                let wantX = mouse.x - frame.width / 2 + side * 170
+                let wantY = mouse.y - frame.height / 2
+                frame.origin.x += (wantX - frame.origin.x) * min(1, 1.2 * dt)
+                frame.origin.y += (wantY - frame.origin.y) * min(1, 1.2 * dt)
+                pet.look = side > 0 ? -1 : 1
+            }
         }
         // 마우스가 다가오면 쳐다보고, 오랜만이면 손을 흔든다
         let mouse = NSEvent.mouseLocation
