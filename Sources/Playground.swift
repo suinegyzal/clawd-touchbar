@@ -172,7 +172,10 @@ final class Playground {
 
     /// 완료 알림 확인
     func acknowledge(_ pet: Clawd) {
-        if let id = pet.sessionID { link?.acknowledge(id) }
+        if let id = pet.sessionID {
+            link?.focusApp(of: id)   // 작업하던 창으로 데려다 준다
+            link?.acknowledge(id)
+        }
         pollIn = 0
     }
 

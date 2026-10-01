@@ -1,4 +1,4 @@
-import Foundation
+import AppKit
 
 /// Claude Code 훅(hooks/clawd-hook.sh)이 ~/.clawd-touchbar/events 에 떨군 JSON을 읽어
 /// 세션마다 "지금 무엇을 하고 있는지"를 정리한다.
@@ -30,6 +30,8 @@ final class ClaudeLink {
         /// 세션 제목(주제). 제목은 도중에 생기거나 바뀔 수 있어서 가끔 다시 읽는다.
         var topic: String?
         var topicCheckedAt = Date.distantPast
+        /// 이 세션이 도는 앱의 실행 파일 (훅이 적어 준다). 완료를 확인하면 이 앱을 앞으로 가져온다
+        var appPath: String?
         /// 아이디어 리서치 루틴 세션: 끝나도 완료 알림 대신 아이디어 말풍선으로 알린다
         var isRoutine = false
     }
@@ -155,6 +157,7 @@ final class ClaudeLink {
         var session = sessions[id] ?? Session(id: id, status: .working(.think, ""), lastEvent: date, workStart: date)
         session.lastEvent = date
         if let path = json["transcript_path"] as? String { session.transcript = path }
+        if let app = json["clawd_app"] as? String, !app.isEmpty { session.appPath = app }
 
         switch event {
         case "UserPromptSubmit":
@@ -197,6 +200,22 @@ final class ClaudeLink {
         }
         if event != "Stop" { session.pendingStop = nil }
         sessions[id] = session
+    }
+
+    /// 실행 파일 경로에서 가장 바깥 .app 번들 (Orca Helper.app 안이면 Orca.app)
+    static func bundlePath(from executable: String) -> String? {
+        guard let range = executable.range(of: ".app/") else { return nil }
+        return String(executable[..<range.lowerBound]) + ".app"
+    }
+
+    /// 그 세션을 돌리던 앱(터미널, Claude 데스크톱…)을 앞으로 가져온다
+    func focusApp(of id: String) {
+        guard let exe = sessions[id]?.appPath, let bundle = Self.bundlePath(from: exe) else { return }
+        if let running = NSWorkspace.shared.runningApplications.first(where: { $0.bundleURL?.path == bundle }) {
+            running.activate(options: [.activateIgnoringOtherApps])
+        } else {
+            NSWorkspace.shared.open(URL(fileURLWithPath: bundle))
+        }
     }
 
     /// 완료 알림을 확인했다 (Touch Bar에서 톡 치거나 메뉴에서)
