@@ -101,11 +101,14 @@ final class Playground {
         pets.append(pet)
     }
 
-    func dropTreat(at x: CGFloat? = nil) {
+    @discardableResult
+    func dropTreat(at x: CGFloat? = nil) -> Treat {
         if treats.count >= 8 { treats.removeFirst() }
         let tx = min(max(x ?? CGFloat.random(in: minX...maxX), 5), width - 5)
-        treats.append(Treat(x: tx, y: height - 4))
+        let treat = Treat(x: tx, y: height - 4)
+        treats.append(treat)
         for pet in pets { pet.noticeTreat(in: self) }
+        return treat
     }
 
     func pet(at x: CGFloat) -> Clawd? {

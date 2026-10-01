@@ -80,6 +80,10 @@ final class Clawd {
     private var attentionIn = 0.0
     private var grumble: String?
     private var dizzyFor = 0.0
+    /// 함께한 기록 (화면 위 모드의 장부가 모아 간다)
+    private(set) var treatsEaten = 0
+    private(set) var patsReceived = 0
+    private(set) var donesSeen = 0
     private var dizzyStarIn = 0.0
     private var yawnFor = 0.0
     private var grumbleFor = 0.0
@@ -540,6 +544,7 @@ final class Clawd {
 
     private func eat(_ treat: Treat, _ world: Playground) {
         world.eat(treat)
+        treatsEaten += 1
         target = nil
         moving = false
         happyFor = 1.4
@@ -574,6 +579,7 @@ final class Clawd {
         case .announce:
             // 완료 알림 확인!
             world.acknowledge(self)
+            donesSeen += 1
             job = nil
             jobKey = ""
             speech = nil
@@ -593,16 +599,18 @@ final class Clawd {
     // MARK: - 화면 위 모드에서 사람과 놀기
 
     private var freeToPlay: Bool { job == nil && [.idle, .rest, .walk, .clock].contains(activity) }
+    /// 일하는 중에도 잠깐 고개를 들 수 있는 상태 (자거나, 들려 있거나, 말풍선을 든 중은 제외)
+    private var canGreet: Bool { freeToPlay || [.think, .study, .craft, .exercise].contains(activity) }
 
     /// 가까이 온 마우스를 쳐다본다 (놀고 있을 때만, 걷는 중엔 방향을 바꾸지 않는다)
     func watch(cursorAt dx: CGFloat) {
-        guard freeToPlay, activity != .walk, abs(dx) > 4 else { return }
+        guard canGreet, activity != .walk, abs(dx) > 4 else { return }
         look = dx > 0 ? 1 : -1
     }
 
     /// 오랜만에 마우스가 다가오면 손을 흔든다
     func wave() {
-        guard freeToPlay else { return }
+        guard canGreet else { return }
         happyFor = 1
         begin(.cheer, for: 0.8...1.1)
     }
@@ -619,8 +627,17 @@ final class Clawd {
     /// 쓰다듬기: 뛰지 않고 좋아하기만 한다 (자고 있어도 깨우지 않는다)
     func pat(in world: Playground) {
         guard activity != .held, activity != .fall else { return }
+        patsReceived += 1
         happyFor = 1.2
         heart(in: world)
+    }
+
+    /// 간식을 뺏겼거나 늦었을 때
+    func sulk(in world: Playground) {
+        guard job == nil, activity != .held, activity != .fall else { return }
+        exclaim("…", in: world)
+        begin(.rest, for: 2...3)
+        look = 0
     }
 
     func grab(in world: Playground) {

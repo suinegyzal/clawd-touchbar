@@ -1,5 +1,69 @@
 import AppKit
 
+/// Clawd 한 마리의 생애 기록. ~/.clawd-touchbar/pets.json 에 순번대로 남는다.
+struct PetRecord: Codable {
+    var name: String
+    var born: Date
+    var seconds: Double = 0
+    var treats = 0
+    var pats = 0
+    var dones = 0
+
+    static let names = ["뭉치", "콩이", "호두", "두부", "감자", "모찌", "구름", "보리", "자두", "땅콩"]
+
+    var together: String {
+        let total = Int(seconds)
+        let days = total / 86400, hours = total % 86400 / 3600, minutes = total % 3600 / 60
+        if days > 0 { return "\(days)일 \(hours)시간" }
+        if hours > 0 { return "\(hours)시간 \(minutes)분" }
+        return "\(minutes)분"
+    }
+}
+
+final class PetLedger {
+    static let shared = PetLedger()
+    static let file = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".clawd-touchbar/pets.json")
+    private(set) var records: [PetRecord] = []
+    private var dirty = false
+
+    init() {
+        if let data = try? Data(contentsOf: Self.file),
+           let list = try? JSONDecoder().decode([PetRecord].self, from: data) { records = list }
+    }
+
+    /// 그 순번의 Clawd 기록. 없으면 오늘 태어난 새 Clawd
+    func record(at slot: Int) -> PetRecord {
+        while records.count <= slot {
+            records.append(PetRecord(name: PetRecord.names[records.count % PetRecord.names.count], born: Date()))
+        }
+        return records[slot]
+    }
+
+    func update(_ slot: Int, _ change: (inout PetRecord) -> Void) {
+        _ = record(at: slot)
+        change(&records[slot])
+        dirty = true
+    }
+
+    func remove(at slot: Int) {
+        guard records.indices.contains(slot) else { return }
+        records.remove(at: slot)
+        save()
+    }
+
+    func saveIfNeeded() { if dirty { save() } }
+
+    func save() {
+        dirty = false
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        encoder.dateEncodingStrategy = .iso8601
+        guard let data = try? encoder.encode(records) else { return }
+        try? FileManager.default.createDirectory(at: Self.file.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try? data.write(to: Self.file, options: .atomic)
+    }
+}
+
 /// 화면 위를 떠다니는 Clawd 한 마리. Touch Bar가 없는 맥을 위한 모드.
 ///
 /// 투명한 창 하나에 작은 놀이터(Playground)를 넣고, Clawd는 늘 창 가운데에 둔다.
@@ -24,12 +88,21 @@ final class PetWindow: NSObject {
     private var shakeTimer = 0.0
     private var announceFor = 0.0
     var lastGreet: CFTimeInterval = 0
+    /// 장부 순번 (한 마리를 보내면 뒤 번호가 당겨진다)
+    var slot: Int
+    private var saveIn = 15.0
+    private var counted = (treats: 0, pats: 0, dones: 0)
+    /// 간식을 떨어뜨렸을 때 (다른 Clawd가 달려오게)
+    var onTreat: ((Treat, PetWindow) -> Void)?
+    private var race: (source: PetWindow, treat: Treat, timeLeft: Double)?
 
     /// 메뉴의 "한 마리 더" / "보내기"
     var onAddPet: (() -> Void)?
     var onRemovePet: ((PetWindow) -> Void)?
 
     init(px: CGFloat, link: ClaudeLink?, slot: Int) {
+        self.slot = slot
+        _ = PetLedger.shared.record(at: slot)
         world.transparent = true
         world.px = px
         world.height = 15 * px
@@ -75,6 +148,12 @@ final class PetWindow: NSObject {
     private func showMenu(_ event: NSEvent) {
         let menu = NSMenu()
         menu.autoenablesItems = false
+        let r = record
+        for line in ["\(r.name) · 함께한 지 \(r.together)", "간식 \(r.treats)개 · 쓰다듬기 \(r.pats)번 · 완료 확인 \(r.dones)번"] {
+            menu.addItem(withTitle: line, action: nil, keyEquivalent: "").isEnabled = false
+        }
+        menu.addItem(withTitle: "이름 바꾸기…", action: #selector(rename), keyEquivalent: "").target = self
+        menu.addItem(.separator())
         for (title, action) in [("간식 주기 ✻", #selector(giveTreat)), ("쓰다듬기 ♥", #selector(patPet))] {
             menu.addItem(withTitle: title, action: action, keyEquivalent: "").target = self
         }
@@ -106,6 +185,24 @@ final class PetWindow: NSObject {
         shakeDir = dir
     }
 
+    /// 함께한 시간과 횟수를 장부에 모은다 (15초마다 저장)
+    private func tickLedger(_ dt: Double) {
+        let now = (pet.treatsEaten, pet.patsReceived, pet.donesSeen)
+        let delta = (now.0 - counted.treats, now.1 - counted.pats, now.2 - counted.dones)
+        counted = now
+        PetLedger.shared.update(slot) {
+            $0.seconds += dt
+            $0.treats += delta.0
+            $0.pats += delta.1
+            $0.dones += delta.2
+        }
+        saveIn -= dt
+        if saveIn <= 0 {
+            saveIn = 15
+            PetLedger.shared.saveIfNeeded()
+        }
+    }
+
     /// 화면에서 Clawd가 있는 자리
     var screenCenter: NSPoint { NSPoint(x: window.frame.midX, y: window.frame.minY + world.spriteHeight / 2) }
 
@@ -116,10 +213,59 @@ final class PetWindow: NSObject {
         lastGreet = CACurrentMediaTime()
     }
 
-    /// 간식은 Clawd 옆 조금 떨어진 곳에 떨어뜨려서 달려가 먹게 한다
-    @objc private func giveTreat() {
+    @objc private func rename() {
+        let alert = NSAlert()
+        alert.messageText = "이 Clawd의 이름"
+        alert.informativeText = "\(record.born.formatted(date: .abbreviated, time: .omitted))에 태어나 함께한 지 \(record.together)."
+        let field = NSTextField(string: record.name)
+        field.frame = NSRect(x: 0, y: 0, width: 200, height: 24)
+        alert.accessoryView = field
+        alert.addButton(withTitle: "저장")
+        alert.addButton(withTitle: "취소")
+        NSApp.activate(ignoringOtherApps: true)
+        guard alert.runModal() == .alertFirstButtonReturn else { return }
+        let name = field.stringValue.trimmingCharacters(in: .whitespaces)
+        guard !name.isEmpty else { return }
+        PetLedger.shared.update(slot) { $0.name = name }
+        PetLedger.shared.save()
+    }
+
+    /// 간식은 Clawd 옆 조금 떨어진 곳에 떨어뜨려서 달려가 먹게 한다. 근처의 다른 Clawd도 달려온다.
+    @objc func giveTreat() {
         let side: CGFloat = Bool.random() ? 1 : -1
-        world.dropTreat(at: pet.x + side * .random(in: 70...150))
+        let treat = world.dropTreat(at: pet.x + side * .random(in: 70...150))
+        onTreat?(treat, self)
+    }
+
+    /// 다른 Clawd의 간식을 보고 달려간다 (놀고 있을 때만). 먼저 닿으면 뺏어 먹고, 늦으면 시무룩.
+    func race(for treat: Treat, in source: PetWindow) {
+        guard !pet.hasJob, [.idle, .rest, .walk, .run, .hop, .clock].contains(pet.activity), race == nil else { return }
+        race = (source, treat, 7)
+    }
+
+    private func tickRace(_ frame: inout NSRect, dt: CGFloat) {
+        guard var r = race else { return }
+        r.timeLeft -= Double(dt)
+        race = r
+        if r.treat.eaten || r.timeLeft <= 0 || pet.hasJob {
+            race = nil
+            if r.treat.eaten { pet.sulk(in: world) }
+            return
+        }
+        let goal = NSPoint(x: r.source.window.frame.minX + r.treat.x, y: r.source.window.frame.minY)
+        let here = NSPoint(x: frame.minX + pet.x, y: frame.minY)
+        let dx = goal.x - here.x, dy = goal.y - here.y
+        if abs(dx) < 36 && abs(dy) < 40 {
+            // 도착! 아직 남아 있으면 뺏어 온다
+            r.source.world.eat(r.treat)
+            world.dropTreat(at: pet.x + (dx > 0 ? 1 : -1) * 30)
+            race = nil
+            return
+        }
+        pet.facing = dx > 0 ? 1 : -1
+        pet.start(.run, seconds: 0.4)
+        frame.origin.x += max(-320 * dt, min(320 * dt, dx))
+        frame.origin.y += max(-220 * dt, min(220 * dt, dy))
     }
 
     @objc private func patPet() { pet.pat(in: world) }
@@ -129,7 +275,10 @@ final class PetWindow: NSObject {
     func close() {
         view.onTick = nil
         window.orderOut(nil)
+        PetLedger.shared.saveIfNeeded()
     }
+
+    var record: PetRecord { PetLedger.shared.record(at: slot) }
 
     func setPixel(_ px: CGFloat) {
         world.transparent = true
@@ -183,6 +332,8 @@ final class PetWindow: NSObject {
             lastMouseX = nil
             shakeCount = 0
         }
+        tickRace(&frame, dt: dt)
+        tickLedger(Double(dt))
         // 완료 알림을 한참 안 보면 커서 옆까지 찾아온다
         announceFor = pet.activity == .announce ? announceFor + Double(dt) : 0
         if announceFor > 45 {

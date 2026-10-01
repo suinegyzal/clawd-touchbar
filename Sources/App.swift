@@ -242,10 +242,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTouchBarDelegate, NS
     private func addPetWindow() {
         let w = PetWindow(px: desktopPixel, link: world.link, slot: petWindows.count)
         w.onAddPet = { [weak self] in self?.addPet() }
+        w.onTreat = { [weak self] treat, source in
+            guard let self else { return }
+            for other in self.petWindows where other !== source && abs(other.screenCenter.x - source.screenCenter.x) < 700 {
+                other.race(for: treat, in: source)
+            }
+        }
         w.onRemovePet = { [weak self] w in
             guard let self, self.petWindows.count > 1, let i = self.petWindows.firstIndex(where: { $0 === w }) else { return }
             self.petWindows.remove(at: i).close()
-            for (slot, rest) in self.petWindows.enumerated() { rest.world.sessionOffset = slot }
+            PetLedger.shared.remove(at: i)
+            for (slot, rest) in self.petWindows.enumerated() { rest.world.sessionOffset = slot; rest.slot = slot }
             self.petCount = self.petWindows.count
         }
         w.world.busy = world.busy
@@ -266,6 +273,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTouchBarDelegate, NS
     }
 
     func applicationWillTerminate(_ notification: Notification) {
+        PetLedger.shared.saveIfNeeded()
         guard !previewMode else { return }
         TouchBarPrivate.dismiss(touchBar)
         TouchBarPrivate.setControlStripPresence(Self.trayID, false)
@@ -564,7 +572,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTouchBarDelegate, NS
     }
 
     @objc private func dropTreat() {
-        if desktopMode { petWindows.randomElement()?.world.dropTreat(); return }
+        if desktopMode { petWindows.randomElement()?.giveTreat(); return }
         if !isShowing && !previewMode { showOnTouchBar() }
         world.dropTreat()
         menuBarPet?.world.dropTreat()
@@ -588,6 +596,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTouchBarDelegate, NS
         if desktopMode {
             guard petWindows.count > 1 else { return }
             petWindows.removeLast().close()
+            PetLedger.shared.remove(at: petWindows.count)
             petCount = petWindows.count
             return
         }
