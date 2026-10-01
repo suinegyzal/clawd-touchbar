@@ -1,6 +1,6 @@
 import AppKit
 
-/// `ClaudeTouchBar --snapshot out.png`: Touch Bar 없이도 그림을 확인할 수 있게
+/// `ClawdPet --snapshot out.png`: Touch Bar 없이도 그림을 확인할 수 있게
 /// 여러 장면을 4배 확대한 PNG 한 장으로 렌더링한다.
 enum Snapshot {
     @MainActor static func write(to path: String) {

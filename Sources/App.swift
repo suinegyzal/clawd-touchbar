@@ -414,7 +414,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTouchBarDelegate, NS
     private func showPreviewWindow() {
         let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: barWidth, height: 30),
                               styleMask: [.titled, .closable], backing: .buffered, defer: false)
-        window.title = "Clawd Touch Bar 미리보기"
+        window.title = "Clawd Pet 미리보기"
         window.isReleasedWhenClosed = false
         window.contentView = playground
         window.center()
@@ -428,7 +428,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTouchBarDelegate, NS
     private func setupStatusItem() {
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         item.button?.image = runnerImages[0]
-        item.button?.toolTip = "Clawd Touch Bar"
+        item.button?.toolTip = "Clawd Pet"
 
         let menu = NSMenu()
         menu.delegate = self

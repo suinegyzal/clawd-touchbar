@@ -1,7 +1,11 @@
-# Clawd Touch Bar
+# Clawd Pet
 
-Claude Code의 픽셀 마스코트 **Clawd**가 맥 화면 맨 위 **메뉴 막대**와 **Touch Bar**에서 사는 작은 앱입니다.
-Claude가 쉬면 Clawd도 놀고, Claude가 일하면 Clawd도 일합니다. Touch Bar가 없는 맥에서도 메뉴 막대에서 똑같이 놀고 일합니다.
+이것저것 만들어보는 공간입니다. 디놈들이 심심해서 만든 토큰 낭비 시리즈-
+
+![화면 위를 떠다니는 Clawd 세 마리](docs/screenshot.png)
+
+Claude Code의 픽셀 마스코트 **Clawd**를 맥 화면에 풀어놓는 작은 앱입니다.
+Claude가 쉬면 Clawd도 놀고, Claude가 일하면 Clawd도 일합니다.
 
 ```
  ▐▛███▜▌
@@ -11,17 +15,28 @@ Claude가 쉬면 Clawd도 놀고, Claude가 일하면 Clawd도 일합니다. Tou
 
 개인이 취미로 만든 비공식 팬 프로젝트입니다. Anthropic과는 관계가 없고, Claude와 Clawd는 Anthropic의 상표·캐릭터입니다. 상업적 용도로 쓰지 않습니다.
 
+## 뭘 하는 앱인가요
+
+- **Claude Code를 따라 일해요.** Claude가 파일을 읽으면 책을 읽고, 명령을 실행하면 아령을 들고, 파일을 고치면 노트북을 두드립니다. 권한을 물어볼 땐 손을 흔들며 "잠깐!", 끝나면 "완료!" 말풍선을 들고 확인할 때까지 기다립니다. 일이 오래 걸리면 땀을 흘리다 점점 붉어지며 짜증을 냅니다.
+- **Mac 상태에 따라 달려요.** CPU, GPU, 메모리 중 고른 기준으로, 바쁠수록 빨리 뛰어다니고 80%를 넘으면 땀을 흘립니다. 메뉴 막대 아이콘도 RunCat처럼 같은 박자로 달립니다.
+- **세 군데서 살아요.** 화면 위를 떠다니는 투명 창(Touch Bar 없는 맥 기본), 메뉴 막대 위, 그리고 Touch Bar가 있는 맥이면 Touch Bar 안.
+- **같이 놀 수 있어요.** 톡 치면 좋아하고, 끌어서 옮기고, 꾹 누르면 쓰다듬고, 세게 흔들면 어지러워합니다. 간식을 주면 달려와 먹고, 옆에 다른 Clawd가 있으면 뺏으러 옵니다. 커서가 다가오면 쳐다보고 손을 흔들고, 두 마리가 가까이 지나치면 서로 인사합니다. 밤 11시가 넘으면 하품하다 잠듭니다.
+- **함께한 기록이 남아요.** Clawd마다 이름, 함께한 시간, 먹은 간식, 쓰다듬은 횟수가 쌓입니다. 이름도 지어 줄 수 있습니다.
+- **그 밖에.** 놀고 있을 땐 가끔 시계 팻말을 들고, 정각엔 "땡!". 선택 사항으로 Claude 예약 작업이 리서치한 아이디어를 말풍선으로 던져 주게 할 수도 있습니다.
+
+Claude Code 세션이 여러 개면 Clawd도 여러 마리 두세요. 한 마리가 세션 하나씩 맡습니다.
+
 ---
 
 ## 내려받아 설치하기 (1분)
 
 **필요한 것**: macOS 12 이상, Claude Code(Claude 데스크톱 앱의 Code 탭 또는 터미널의 `claude`)
 
-1. [Releases](https://github.com/suinegyzal/clawd-touchbar/releases/latest)에서 `ClawdTouchBar.zip`을 내려받아 풉니다.
-2. `ClawdTouchBar.app`을 **응용 프로그램** 폴더로 옮기고 엽니다.
+1. [Releases](https://github.com/suinegyzal/clawd-touchbar/releases/latest)에서 `ClawdPet.zip`을 내려받아 풉니다.
+2. `ClawdPet.app`을 **응용 프로그램** 폴더로 옮기고 엽니다.
    - 처음 열 때 "확인되지 않은 개발자" 경고가 뜨면: **시스템 설정 → 개인정보 보호 및 보안** 맨 아래의 **그래도 열기**를 누릅니다. (macOS 14 이하는 앱을 오른쪽 클릭 → 열기로도 됩니다.) 개발자 서명 없이 배포하는 앱이라 한 번만 거치면 됩니다.
 3. "Clawd를 Claude Code와 연결할까요?" 창에서 **연결**을 누릅니다. 터미널 없이 앱이 알아서 Claude Code 설정에 훅을 넣습니다.
-4. **Claude Code 세션을 새로 시작**하면 Clawd가 Claude를 따라 일하기 시작합니다. Touch Bar가 없는 맥이면 Clawd가 화면 위를 떠다니고, 메뉴 막대에도 작은 Clawd가 돌아다닙니다.
+4. **Claude Code 세션을 새로 시작**하면 Clawd가 Claude를 따라 일하기 시작합니다. Touch Bar가 없는 맥이면 Clawd가 화면 위를 떠다니고, 메뉴 막대에도 작은 Clawd가 돌아다닙니다. 처음 열면 ClawdPet.app 하나로 끝이고 따로 설정할 것은 없습니다.
 
 연결이 하는 일: 내 Claude Code 설정(`~/.claude/settings.json`)에 훅과 상태줄을 추가합니다. 쓰던 다른 설정은 건드리지 않고, 바꾸기 전 원본을 `settings.json.bak-clawd`로 남깁니다. 메뉴 막대 Clawd 메뉴 → **Claude Code 연결 끊기**로 언제든 되돌립니다.
 로그인할 때 자동으로 켜려면 같은 메뉴의 **로그인할 때 자동 실행**을 켭니다.
@@ -29,11 +44,11 @@ Claude가 쉬면 Clawd도 놀고, Claude가 일하면 Clawd도 일합니다. Tou
 ### 소스에서 직접 빌드하기 (개발자용)
 
 ```bash
-git clone https://github.com/suinegyzal/clawd-touchbar.git ~/Documents/ClaudeTouchBar && cd ~/Documents/ClaudeTouchBar && ./install.sh
+git clone https://github.com/suinegyzal/clawd-touchbar.git ~/Documents/ClawdPet && cd ~/Documents/ClawdPet && ./install.sh
 ```
 
 개발 도구(Xcode Command Line Tools)가 없으면 설치 창이 뜹니다. **설치**를 누르고, 끝나면 `./install.sh`를 한 번 더 실행합니다.
-`install.sh`는 앱을 빌드해서 `~/Applications/ClawdTouchBar.app`에 넣고 실행한 뒤, Claude Code에 훅을 연결합니다.
+`install.sh`는 앱을 빌드해서 `~/Applications/ClawdPet.app`에 넣고 실행한 뒤, Claude Code에 훅을 연결합니다.
 
 ---
 
@@ -93,7 +108,7 @@ Clawd 아이콘을 누르면 나오는 메뉴에서:
 Touch Bar가 없는 맥에서는 Clawd가 화면 위를 떠다니는 투명 창에서 삽니다. 연동, 말풍선, 간식, 들어 올리기는 Touch Bar와 똑같이 동작합니다.
 
 ```bash
-open ~/Applications/ClawdTouchBar.app --args --desktop
+open ~/Applications/ClawdPet.app --args --desktop
 ```
 
 한 번 켜면 기억하므로 다음부터는 그냥 실행해도 됩니다. 메뉴 막대 → "화면 위에 띄우기"로 켜고 끌 수 있습니다.
@@ -127,13 +142,13 @@ Claude 앱에서 "이 내용으로 3시간마다 도는 예약 작업 만들어 
 ## 업데이트 받기
 
 ```bash
-cd ~/Documents/ClaudeTouchBar && git pull && ./install.sh
+cd ~/Documents/ClawdPet && git pull && ./install.sh
 ```
 
 ## 지우기
 
 ```bash
-cd ~/Documents/ClaudeTouchBar && ./uninstall.sh
+cd ~/Documents/ClawdPet && ./uninstall.sh
 ```
 
 앱을 끄고, Claude Code 연결을 풀고, `~/Applications`의 앱을 지웁니다. 내가 쓰던 다른 Claude Code 설정은 그대로 둡니다.
@@ -155,13 +170,13 @@ cd ~/Documents/ClaudeTouchBar && ./uninstall.sh
 
 ## 배포하기 (Release 만들기)
 
-`v`로 시작하는 태그를 올리면 GitHub Actions가 Intel + Apple Silicon 유니버설 앱을 빌드해 Release에 `ClawdTouchBar.zip`을 올립니다.
+`v`로 시작하는 태그를 올리면 GitHub Actions가 Intel + Apple Silicon 유니버설 앱을 빌드해 Release에 `ClawdPet.zip`을 올립니다.
 
 ```bash
 git tag v1.0.1 && git push origin v1.0.1
 ```
 
-손으로 만들려면 `VERSION=1.0.1 ./build.sh universal` 뒤에 `ditto -c -k --keepParent build/ClawdTouchBar.app ClawdTouchBar.zip`.
+손으로 만들려면 `VERSION=1.0.1 ./build.sh universal` 뒤에 `ditto -c -k --keepParent build/ClawdPet.app ClawdPet.zip`.
 앱은 임시(ad-hoc) 서명만 되어 있어 처음 열 때 보안 경고가 한 번 뜹니다. Apple 개발자 계정(연 99달러)으로 Developer ID 서명과 공증을 하면 경고 없이 열립니다.
 
 ## 함께 개발하기
@@ -192,9 +207,9 @@ git tag v1.0.1 && git push origin v1.0.1
 개발할 때 쓸 수 있는 옵션:
 
 ```bash
-./build.sh && open build/ClawdTouchBar.app                               # 고친 뒤 바로 띄워 보기
-build/ClawdTouchBar.app/Contents/MacOS/ClawdTouchBar --preview           # Touch Bar 대신 일반 창에서 미리보기
-build/ClawdTouchBar.app/Contents/MacOS/ClawdTouchBar --snapshot out.png  # 여러 장면을 PNG 한 장으로
+./build.sh && open build/ClawdPet.app                               # 고친 뒤 바로 띄워 보기
+build/ClawdPet.app/Contents/MacOS/ClawdPet --preview           # Touch Bar 대신 일반 창에서 미리보기
+build/ClawdPet.app/Contents/MacOS/ClawdPet --snapshot out.png  # 여러 장면을 PNG 한 장으로
 ```
 
 ---

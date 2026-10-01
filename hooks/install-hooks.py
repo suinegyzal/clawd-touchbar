@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""~/.claude/settings.json 에 Clawd Touch Bar 훅과 statusLine을 연결하거나(기본) 떼어 낸다(--remove).
+"""~/.claude/settings.json 에 Clawd Pet 훅과 statusLine을 연결하거나(기본) 떼어 낸다(--remove).
 
 이 저장소를 받은 위치를 기준으로 경로를 넣기 때문에, 누가 어디에 받아도 그 사람 맥에 맞게 설정된다.
 이미 있는 다른 설정은 그대로 두고, 바꾸기 전 원본은 settings.json.bak-clawd 로 남긴다.
