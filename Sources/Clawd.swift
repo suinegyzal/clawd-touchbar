@@ -84,6 +84,8 @@ final class Clawd {
     private(set) var treatsEaten = 0
     private(set) var patsReceived = 0
     private(set) var donesSeen = 0
+    /// 친밀도 단계 (장부가 넣어 준다). 높을수록 더 반갑게 군다
+    var affectionLevel = 0
     private var dizzyStarIn = 0.0
     private var yawnFor = 0.0
     private var grumbleFor = 0.0
@@ -174,7 +176,10 @@ final class Clawd {
             stroll(speed: 30, dt, world)
             if activity == .hop && !isAirborne { vy = world.jumpVelocity(0.45) }
         case .cheer:
-            if timeLeft <= 0 && !isAirborne { decide(world) }
+            if timeLeft <= 0 && !isAirborne {
+                speech = nil   // 축하 말풍선은 여기까지
+                decide(world)
+            }
         case .sleep:
             zIn -= dt
             if zIn <= 0 {
@@ -609,10 +614,21 @@ final class Clawd {
     }
 
     /// 오랜만에 마우스가 다가오면 손을 흔든다
-    func wave() {
+    func wave(in world: Playground? = nil) {
         guard canGreet else { return }
         happyFor = 1
         begin(.cheer, for: 0.8...1.1)
+        if affectionLevel >= 3, let world, !isAirborne { vy = world.jumpVelocity(0.5) }
+    }
+
+    /// 친밀도가 올랐을 때: 말풍선 들고 폴짝폴짝, 하트 뿌리기
+    func celebrate(_ title: String, _ text: String, in world: Playground) {
+        guard activity != .held, activity != .fall else { return }
+        speech = Speech(title: title, text: text)
+        happyFor = 3.2
+        begin(.cheer, for: 3.0...3.2)
+        if !isAirborne { vy = world.jumpVelocity(0.9) }
+        for _ in 0..<4 { heart(in: world) }
     }
 
     /// 들고 세게 흔들면 어지러워한다 (내려놓은 뒤에도 잠깐 비틀거린다)
@@ -629,7 +645,7 @@ final class Clawd {
         guard activity != .held, activity != .fall else { return }
         patsReceived += 1
         happyFor = 1.2
-        heart(in: world)
+        for _ in 0..<(1 + affectionLevel / 2) { heart(in: world) }
     }
 
     /// 간식을 뺏겼거나 늦었을 때
@@ -787,7 +803,7 @@ final class Clawd {
 
     /// 확인 요청이나 완료 알림 말풍선, 그리고 말풍선이 떠 있던 시간
     var bubble: (speech: Speech, age: Double)? {
-        guard let speech, [.call, .announce, .idea].contains(activity) else { return nil }
+        guard let speech, [.call, .announce, .idea, .cheer].contains(activity) else { return nil }
         return (speech, activityClock)
     }
 

@@ -8,6 +8,22 @@ struct PetRecord: Codable {
     var treats = 0
     var pats = 0
     var dones = 0
+    /// 친밀도: 쓰다듬기 +1(하루 60번까지), 간식 +3, 완료 확인 +5, 함께한 30분마다 +1
+    var affection = 0
+    var patsToday = 0
+    var patsDay = ""
+
+    static let levels: [(need: Int, title: String)] = [
+        (0, "낯가림"), (30, "아는 사이"), (100, "친구"), (300, "단짝"), (800, "가족"), (2000, "영혼의 단짝"),
+    ]
+    var level: Int { Self.levels.lastIndex { affection >= $0.need } ?? 0 }
+    var levelTitle: String { Self.levels[level].title }
+    var nextNeed: Int? { level + 1 < Self.levels.count ? Self.levels[level + 1].need : nil }
+    /// "♥♥♡♡♡ 친구 · 123/300"
+    var affectionLine: String {
+        let hearts = String(repeating: "♥", count: level) + String(repeating: "♡", count: Self.levels.count - 1 - level)
+        return "\(hearts) \(levelTitle) · " + (nextNeed.map { "\(affection)/\($0)" } ?? "\(affection)")
+    }
 
     static let names = ["뭉치", "콩이", "호두", "두부", "감자", "모찌", "구름", "보리", "자두", "땅콩"]
 
@@ -150,7 +166,7 @@ final class PetWindow: NSObject {
         let menu = NSMenu()
         menu.autoenablesItems = false
         let r = record
-        for line in ["\(r.name) · 함께한 지 \(r.together)", "간식 \(r.treats)개 · 쓰다듬기 \(r.pats)번 · 완료 확인 \(r.dones)번"] {
+        for line in ["\(r.name) · 함께한 지 \(r.together)", r.affectionLine, "간식 \(r.treats)개 · 쓰다듬기 \(r.pats)번 · 완료 확인 \(r.dones)번"] {
             menu.addItem(withTitle: line, action: nil, keyEquivalent: "").isEnabled = false
         }
         menu.addItem(withTitle: "이름 바꾸기…", action: #selector(rename), keyEquivalent: "").target = self
@@ -191,11 +207,25 @@ final class PetWindow: NSObject {
         let now = (pet.treatsEaten, pet.patsReceived, pet.donesSeen)
         let delta = (now.0 - counted.treats, now.1 - counted.pats, now.2 - counted.dones)
         counted = now
+        let before = record.level
         PetLedger.shared.update(slot) {
+            let halfHoursBefore = Int($0.seconds / 1800)
             $0.seconds += dt
             $0.treats += delta.0
             $0.pats += delta.1
             $0.dones += delta.2
+            // 친밀도
+            let today = ISO8601DateFormatter.string(from: Date(), timeZone: .current, formatOptions: [.withFullDate])
+            if $0.patsDay != today { $0.patsDay = today; $0.patsToday = 0 }
+            let countedPats = min(delta.1, max(0, 60 - $0.patsToday))
+            $0.patsToday += delta.1
+            $0.affection += countedPats + delta.0 * 3 + delta.2 * 5 + (Int($0.seconds / 1800) - halfHoursBefore)
+        }
+        let r = record
+        pet.affectionLevel = r.level
+        if r.level > before {
+            pet.celebrate("♥ \(r.levelTitle)!", "\(r.name)와 \(r.levelTitle)이 됐어요", in: world)
+            PetLedger.shared.save()
         }
         saveIn -= dt
         if saveIn <= 0 {
@@ -210,7 +240,7 @@ final class PetWindow: NSObject {
     /// 다른 Clawd가 옆에 오면 그쪽을 보며 손을 흔든다
     func greet(toward dx: CGFloat) {
         pet.look = dx > 0 ? 1 : -1
-        pet.wave()
+        pet.wave(in: world)
         lastGreet = CACurrentMediaTime()
     }
 
@@ -363,7 +393,7 @@ final class PetWindow: NSObject {
         if window.frame.insetBy(dx: -60, dy: -60).contains(mouse) {
             let local = view.convert(window.convertPoint(fromScreen: mouse), from: nil)
             if abs(local.x - pet.x) < 160 {
-                if cursorAwayFor > 4 { pet.wave() }
+                if cursorAwayFor > 4 && record.level >= 1 { pet.wave(in: world) }
                 cursorAwayFor = 0
                 pet.watch(cursorAt: local.x - pet.x)
             } else {
