@@ -187,6 +187,14 @@ final class Clawd {
                 if !isAirborne { vy = world.jumpVelocity(0.5) }
             }
         case .idea:
+            // 다른 곳(Touch Bar나 메뉴 막대)에서 이미 확인했으면 같이 내린다
+            if let idea = pitchedIdea, world.ideas?.isSeen(idea) == true {
+                pitchedIdea = nil
+                speech = nil
+                happyFor = 1
+                begin(.cheer, for: 0.6...0.9)
+                return
+            }
             // 아이디어 말풍선을 들고 가끔 폴짝. 시간이 지나면 말풍선을 내린다.
             attentionIn -= dt
             if attentionIn <= 0 {

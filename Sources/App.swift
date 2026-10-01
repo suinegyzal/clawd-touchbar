@@ -24,6 +24,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTouchBarDelegate, NS
         static let controls = "showControls"
         static let metrics = "showMetrics"
         static let source = "runnerSource"
+        static let menuBarPet = "menuBarPet"
     }
     private static let barID = NSTouchBarItem.Identifier("com.local.ClaudeTouchBar.playground")
     private static let trayID = NSTouchBarItem.Identifier("com.local.ClaudeTouchBar.tray")
@@ -65,12 +66,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTouchBarDelegate, NS
     private var metricsItem: NSMenuItem!
     private var statsLines: [NSMenuItem] = []
     private let ideasMenu = NSMenu()
+    private var menuBarPet: MenuBarPet?
+    private var menuBarPetItem: NSMenuItem!
     private var sourceItems: [NSMenuItem] = []
 
     init(preview: Bool) {
         previewMode = preview
         super.init()
-        defaults.register(defaults: [Key.count: 1, Key.big: true, Key.wide: false, Key.controls: true, Key.metrics: true])
+        defaults.register(defaults: [Key.count: 1, Key.big: true, Key.wide: false, Key.controls: true, Key.metrics: true, Key.menuBarPet: true])
     }
 
     private var petCount: Int {
@@ -124,6 +127,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTouchBarDelegate, NS
         try? FileManager.default.createDirectory(at: ClaudeLink.directory, withIntermediateDirectories: true)
         world.link = ClaudeLink(pendingFile: ClaudeLink.pendingFile)
         world.ideas = IdeaBox()
+        if !previewMode {
+            menuBarPet = MenuBarPet(link: world.link, ideas: world.ideas)
+            menuBarPet?.petCount = petCount
+            if defaults.bool(forKey: Key.menuBarPet) { menuBarPet?.show() }
+        }
         startStats()
         playground.preferredWidth = barWidth
         playground.onVisibilityChange = { [weak self] visible in
@@ -156,6 +164,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTouchBarDelegate, NS
             let busy = self.stats.value(for: self.runnerSource)
             self.world.busy = busy
             self.metricsView.busy = busy
+            self.menuBarPet?.world.busy = busy
             self.metricsView.tick()
         }
         RunLoop.main.add(timer, forMode: .common)
@@ -330,6 +339,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTouchBarDelegate, NS
         wideItem = menu.addItem(withTitle: "넓게 쓰기 (Control Strip 가리기)", action: #selector(toggleWide), keyEquivalent: "")
         controlsItem = menu.addItem(withTitle: "밝기·소리 버튼", action: #selector(toggleControls), keyEquivalent: "")
         metricsItem = menu.addItem(withTitle: "Touch Bar에 Mac 상태 보기", action: #selector(toggleMetrics), keyEquivalent: "")
+        menuBarPetItem = menu.addItem(withTitle: "메뉴 막대에서 돌아다니기", action: #selector(toggleMenuBarPet), keyEquivalent: "")
         menu.addItem(.separator())
         menu.addItem(withTitle: "종료", action: #selector(quit), keyEquivalent: "q")
         for menuItem in menu.items where menuItem.action != nil { menuItem.target = self }
@@ -373,6 +383,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTouchBarDelegate, NS
         controlsItem.state = showControls ? .on : .off
         controlsItem.isEnabled = useWide && !previewMode
         metricsItem.state = showMetrics ? .on : .off
+        menuBarPetItem.state = menuBarPet?.isShowing == true ? .on : .off
+        menuBarPetItem.isEnabled = menuBarPet != nil
         metricsItem.isEnabled = !previewMode
     }
 
@@ -408,6 +420,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTouchBarDelegate, NS
     @objc private func pitchIdea() {
         if !isShowing && !previewMode { showOnTouchBar() }
         world.pitchIdeaNow()
+        menuBarPet?.world.pitchIdeaNow()
     }
 
     @objc private func openReports() {
@@ -422,18 +435,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTouchBarDelegate, NS
     @objc private func dropTreat() {
         if !isShowing && !previewMode { showOnTouchBar() }
         world.dropTreat()
+        menuBarPet?.world.dropTreat()
     }
 
     @objc private func addPet() {
         guard world.pets.count < Self.maxPets else { return }
         world.addPet()
         petCount = world.pets.count
+        menuBarPet?.world.addPet()
+        menuBarPet?.petCount = petCount
     }
 
     @objc private func removePet() {
         guard world.pets.count > 1 else { return }
         world.setPetCount(world.pets.count - 1)
         petCount = world.pets.count
+        menuBarPet?.world.setPetCount(petCount)
+        menuBarPet?.petCount = petCount
     }
 
     @objc private func toggleBig() {
@@ -446,6 +464,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTouchBarDelegate, NS
         runnerSource = source
         world.busy = stats.value(for: source)
         metricsView.busy = world.busy
+    }
+
+    @objc private func toggleMenuBarPet() {
+        guard let menuBarPet else { return }
+        let show = !menuBarPet.isShowing
+        defaults.set(show, forKey: Key.menuBarPet)
+        show ? menuBarPet.show() : menuBarPet.hide()
     }
 
     @objc private func toggleMetrics() {

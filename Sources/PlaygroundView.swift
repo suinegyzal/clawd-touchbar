@@ -6,8 +6,10 @@ enum Renderer {
     private static let bubbleFont = NSFont.systemFont(ofSize: 11, weight: .medium)
 
     static func draw(_ world: Playground, in ctx: CGContext, size: CGSize, scale: CGFloat) {
-        ctx.setFillColor(CGColor(gray: 0, alpha: 1))
-        ctx.fill(CGRect(origin: .zero, size: size))
+        if !world.transparent {
+            ctx.setFillColor(CGColor(gray: 0, alpha: 1))
+            ctx.fill(CGRect(origin: .zero, size: size))
+        }
 
         let px = world.px
         let smallPx = max(1, (px * 0.75 * scale).rounded() / scale)
@@ -154,6 +156,12 @@ enum Renderer {
         let fitsRight = pet.x + half + gap + size.width <= world.width
         let x = fitsRight ? pet.x + half + gap : pet.x - half - gap - size.width
         let y = (world.spriteHeight - size.height) / 2 + 1
+        if world.transparent {
+            // 메뉴 막대처럼 밝을 수도 있는 바탕에서도 읽히게 어두운 받침을 깐다
+            let backdrop = CGRect(x: x - 4, y: y - 1, width: size.width + 8, height: size.height + 2)
+            NSColor(white: 0.1, alpha: 0.8).setFill()
+            NSBezierPath(roundedRect: backdrop, xRadius: backdrop.height / 2, yRadius: backdrop.height / 2).fill()
+        }
         text.draw(at: CGPoint(x: x, y: y))
     }
 
@@ -311,6 +319,19 @@ final class PlaygroundView: NSView {
         timer = nil
     }
 
+    /// 다른 화면 위에 겹친 창(메뉴 막대)은 클릭을 그대로 통과시키고,
+    /// 마우스가 Clawd나 말풍선 위에 있을 때만 받는다.
+    private func updateClickThrough() {
+        guard let window else { return }
+        let point = convert(window.convertPoint(fromScreen: NSEvent.mouseLocation), from: nil)
+        let overPet = world.pets.contains { pet in
+            (abs(pet.x - point.x) <= world.spriteWidth / 2 + 2 && point.y <= pet.y + world.spriteHeight + 2)
+                || (pet.bubbleFrame?.contains(point) ?? false)
+        }
+        let ignore = !overPet && grips.isEmpty
+        if window.ignoresMouseEvents != ignore { window.ignoresMouseEvents = ignore }
+    }
+
     @objc private func tick() {
         let now = CACurrentMediaTime()
         let dt = min(now - lastTick, 1.0 / 20.0)
@@ -318,6 +339,7 @@ final class PlaygroundView: NSView {
         if bounds.width > 40 { world.width = bounds.width }
         world.update(dt)
         needsDisplay = true
+        if world.transparent { updateClickThrough() }
     }
 
     override func draw(_ dirtyRect: NSRect) {

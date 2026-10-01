@@ -112,19 +112,43 @@ enum Snapshot {
             scenes.append(frozen(moody, width: 1004))
         }
 
+        // 메뉴 막대 (투명, 24pt): 밝은 메뉴 막대와 어두운 메뉴 막대 위에서
+        let bar = Playground()
+        bar.transparent = true
+        bar.width = 1004
+        bar.height = 24
+        bar.px = 1.5
+        let barLink = ClaudeLink(directory: URL(fileURLWithPath: "/nonexistent-clawd-snapshot"))
+        bar.link = barLink
+        for x in [60, 330, 640, 900] as [CGFloat] { bar.addPet(at: x) }
+        for _ in 0..<90 { bar.update(1.0 / 60.0) }
+        barLink.handle(["session_id": "w", "hook_event_name": "UserPromptSubmit", "prompt": "디놈들 카드뉴스"],
+                       at: Date().addingTimeInterval(-7 * 60))
+        barLink.handle(["session_id": "w", "hook_event_name": "PreToolUse", "tool_name": "Edit", "tool_input": [:]])
+        barLink.handle(["session_id": "d", "hook_event_name": "Stop", "last_assistant_message": "릴스 아이디어 3개를 정리했어요."])
+        for _ in 0..<90 { bar.update(1.0 / 60.0) }
+        let barImage = frozen(bar, width: 1004)
+        for shade in [0.92, 0.2] as [CGFloat] {
+            scenes.append { ctx in
+                ctx.setFillColor(CGColor(gray: shade, alpha: 1))
+                ctx.fill(CGRect(x: 0, y: 0, width: 1004, height: 30))
+                barImage(ctx)
+            }
+        }
+
         render(scenes, width: 1004, to: path)
     }
 
     private static func frozen(_ world: Playground, width: CGFloat) -> (CGContext) -> Void {
         let scale: CGFloat = 4
         let cs = CGColorSpace(name: CGColorSpace.sRGB)!
-        let ctx = CGContext(data: nil, width: Int(width * scale), height: Int(30 * scale), bitsPerComponent: 8,
+        let ctx = CGContext(data: nil, width: Int(width * scale), height: Int(world.height * scale), bitsPerComponent: 8,
                             bytesPerRow: 0, space: cs, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
         ctx.scaleBy(x: scale, y: scale)
         NSGraphicsContext.current = NSGraphicsContext(cgContext: ctx, flipped: false)
-        Renderer.draw(world, in: ctx, size: CGSize(width: width, height: 30), scale: 2)
+        Renderer.draw(world, in: ctx, size: CGSize(width: width, height: world.height), scale: 2)
         let image = ctx.makeImage()!
-        return { target in target.draw(image, in: CGRect(x: 0, y: 0, width: width, height: 30)) }
+        return { target in target.draw(image, in: CGRect(x: 0, y: 0, width: width, height: world.height)) }
     }
 
     private static func render(_ scenes: [(CGContext) -> Void], width: CGFloat, to path: String) {

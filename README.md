@@ -1,10 +1,7 @@
-
-**주제**는 Claude 앱이 세션에 붙인 제목(사이드바에 보이는 이름)입니다. 예: `작업 중 · 디놈들 인스타 카드뉴스`.
-제목이 아직 없는 새 세션이면 요청 내용 앞부분을, 그것도 없으면 다루는 파일 이름을 보여 줍니다.
 # Clawd Touch Bar
 
-MacBook Pro Touch Bar 위에서 Claude Code의 픽셀 마스코트 **Clawd**가 사는 작은 앱입니다.
-Claude가 쉬면 Clawd도 놀고, Claude가 일하면 Clawd도 일합니다.
+Claude Code의 픽셀 마스코트 **Clawd**가 맥 화면 맨 위 **메뉴 막대**와 **Touch Bar**에서 사는 작은 앱입니다.
+Claude가 쉬면 Clawd도 놀고, Claude가 일하면 Clawd도 일합니다. Touch Bar가 없는 맥에서도 메뉴 막대에서 똑같이 놀고 일합니다.
 
 ```
  ▐▛███▜▌
@@ -12,28 +9,50 @@ Claude가 쉬면 Clawd도 놀고, Claude가 일하면 Clawd도 일합니다.
   ▘▘ ▝▝
 ```
 
-## Claude와 연동
+---
 
-Claude Code의 훅(`~/.claude/settings.json`)이 상태를 앱에 알려 줍니다. Claude Code CLI와 Claude 데스크톱 앱의 Code 탭 모두에서 동작합니다.
+## 3분 만에 시작하기
+
+**필요한 것**: macOS 12 이상, Claude Code(Claude 데스크톱 앱의 Code 탭 또는 터미널의 `claude`)
+
+1. 터미널을 열고 아래 명령을 붙여 넣습니다. 저장소가 비공개라면 먼저 저장소 주인에게 초대를 받아 수락해야 합니다.
+
+   ```bash
+   git clone https://github.com/suinegyzal/clawd-touchbar.git ~/Documents/ClaudeTouchBar && cd ~/Documents/ClaudeTouchBar && ./install.sh
+   ```
+
+2. 개발 도구(Xcode Command Line Tools)가 없으면 설치 창이 뜹니다. **설치**를 누르고, 끝나면 `./install.sh`를 한 번 더 실행합니다.
+3. 화면 맨 위 메뉴 막대에 Clawd가 나타나면 성공입니다. **Claude Code 세션을 새로 시작**하면 Clawd가 Claude를 따라 일하기 시작합니다.
+
+`install.sh`가 하는 일:
+- 앱을 빌드해서 `~/Applications/ClawdTouchBar.app`에 넣고 실행합니다.
+- 내 Claude Code 설정(`~/.claude/settings.json`)에 훅과 상태줄을 연결합니다. 내가 쓰던 다른 설정은 건드리지 않고, 바꾸기 전 원본을 `settings.json.bak-clawd`로 남깁니다.
+
+로그인할 때 자동으로 켜려면: **시스템 설정 → 일반 → 로그인 항목 → + → 홈 폴더의 응용 프로그램 → ClawdTouchBar**
+
+---
+
+## 이렇게 움직여요
+
+### Claude를 따라 일해요
 
 | Claude가 하는 일 | Clawd가 하는 일 |
 |---|---|
 | 쉬는 중 | 걷기, 뛰기, 깡충깡충, 앉아서 쉬기, 자기 (오래 쉴수록 더 자주 잠) |
 | 요청을 받고 생각 중 | 위를 보며 `✻ 생각 중 · (주제)` |
 | 파일 읽기·검색·웹 조회 | 📖 책 읽기 `공부 중 · (주제)` |
-| 명령 실행 (Bash 등) | 🏋️ 아령 들기 `운동 중 · (주제)` |
-| 파일 수정·작성 등 | 💻 노트북 타자 `작업 중 · (주제)` |
-| 권한 확인이 필요할 때 | 손을 흔들며 말풍선 `잠깐! Bash 써도 될까요?` |
-| 작업이 끝났을 때 | 폴짝 뛰며 말풍선 `완료! (마지막 답변의 첫 문장)` — 확인할 때까지 계속 |
+| 명령 실행 | 🏋️ 아령 들기 `운동 중 · (주제)` |
+| 파일 수정·작성 | 💻 노트북 타자 `작업 중 · (주제)` |
+| 권한 확인이 필요할 때 | 손을 흔들며 `잠깐! Bash 써도 될까요?` |
+| 작업이 끝났을 때 | 폴짝 뛰며 `완료! (마지막 답변의 첫 문장)` |
 
-**완료 알림**은 확인할 때까지 사라지지 않고(앱을 다시 켜도 남아 있음), Clawd가 가끔 폴짝 뛰며 봐 달라고 합니다. 아래 중 하나면 확인한 것으로 봅니다.
-Clawd가 한 마리면 완료 알림을 확인하기 전까지는 다른 세션이 일하는 모습 대신 알림을 보여 줍니다.
+- **주제**는 Claude 앱 사이드바에 보이는 세션 제목입니다. 제목이 없으면 요청 내용 앞부분을 보여 줍니다.
+- **완료 알림**은 확인할 때까지 남아 있습니다(앱을 다시 켜도 유지). Clawd나 말풍선을 클릭(Touch Bar에선 톡)하거나, 그 세션에 새 요청을 보내거나, 메뉴 → "완료 알림 모두 확인"을 누르면 사라집니다.
+- 세션이 여러 개면 Clawd를 여러 마리 두세요(메뉴 → Clawd 한 마리 더, 최대 6마리). 한 마리가 한 세션씩 맡습니다.
 
-- Touch Bar에서 그 Clawd나 말풍선을 톡 치기
-- 그 세션에 새 요청 보내기
-- 메뉴 → 완료 알림 모두 확인
+### 오래 걸리면 짜증 내요
 
-**일이 오래 걸리면** 기분이 나빠집니다 (요청을 보낸 뒤 흐른 시간 기준, 옆 문구에 `· 7분`처럼 표시).
+요청을 보낸 뒤 흐른 시간이 문구에 `· 7분`처럼 붙고, 시간이 갈수록 표정이 바뀝니다.
 
 | 걸린 시간 | Clawd |
 |---|---|
@@ -42,135 +61,104 @@ Clawd가 한 마리면 완료 알림을 확인하기 전까지는 다른 세션�
 | 5~10분 | 가끔 `> <` 찡그림, 머리에서 김, 살짝 붉어짐, "아직이야?" |
 | 10분 넘게 | 계속 찡그림, 💢, 새빨개져서 부들부들, 발 구르기, "언제 끝나!" |
 
-**주제**는 Claude 앱이 세션에 붙인 제목(사이드바에 보이는 이름)입니다. 예: `작업 중 · 디놈들 인스타 카드뉴스`.
-제목이 아직 없는 새 세션이면 요청 내용 앞부분을, 그것도 없으면 다루는 파일 이름을 보여 줍니다.
+### 놀 때는
 
-세션이 여러 개면 Clawd를 여러 마리 두세요(메뉴 → Clawd 한 마리 더). 완료 알림 → 확인 요청 → 작업 중 순서로 한 마리씩 맡습니다.
+- **시계**: 노는 Clawd가 둘 이상이면 한 마리가 시계 팻말을 들고 다닙니다. 혼자면 가끔 들어 보여 줍니다. 정각엔 "땡!"
+- **RunCat처럼**: Mac이 바쁠수록(기본 CPU) 더 자주, 더 빨리 달립니다. 메뉴 막대 아이콘의 Clawd도 제자리에서 바쁜 만큼 빨리 달립니다.
+- **같이 놀기**: Clawd를 클릭(톡)하면 기뻐하고, 끌어서 옮길 수 있고, 메뉴 → "간식 떨어뜨리기"로 간식을 주면 달려가 먹습니다. Touch Bar에서는 빈 곳을 톡 쳐도 간식이 떨어집니다.
+- **💡 아이디어**: 아이디어 리서치 루틴(아래)을 만들어 두면, 가끔 "💡 아이디어!" 말풍선으로 하나씩 던집니다. 클릭하면 보고서가 열립니다.
 
-연동을 끄려면 `~/.claude/settings.json`에서 `clawd-hook.sh`가 들어간 항목을 지우면 됩니다.
-훅은 앱이 꺼져 있으면 아무것도 하지 않고, Claude Code의 동작을 막지 않습니다.
+### 메뉴 막대와 Touch Bar
 
-## Mac 상태 보기 (RunCat처럼)
+- **메뉴 막대**: Touch Bar와 같은 수의 Clawd가 같은 행동을 합니다. 메뉴 막대 클릭은 그대로 통과하고, Clawd 위에서만 클릭됩니다. 전체 화면 앱에서는 보이지 않습니다.
+- **Touch Bar** (있는 맥만): Touch Bar 설정이 "확장된 Control Strip"이면 Touch Bar 전체를 쓰면서, 오른쪽에 **밝기 −/+ · 음소거 · 볼륨 −/+** 버튼과 작은 Mac 상태 대시보드(CPU·메모리 / GPU·저장 공간 / 배터리·네트워크)를 함께 보여 줍니다.
 
-[RunCat](https://github.com/runcat-dev)처럼 Mac이 바쁠수록 Clawd가 빨리 달립니다.
+### 메뉴 막대 메뉴
 
-- **메뉴 막대 아이콘**: Clawd가 제자리에서 계속 달립니다. 한가하면 느긋하게(초당 2걸음), 꽉 차면 전속력(초당 16걸음 정도)으로 달립니다.
-- **Touch Bar 대시보드 왼쪽**: 같은 박자로 달리고, 빠를 땐 뒤로 속도선이 흐릅니다.
-- **Touch Bar 위의 Clawd**: Claude가 쉬는 동안에는 바쁠수록 자주·빨리 뛰어다니고, 80%를 넘으면 땀을 흘립니다.
-- **달리기 기준**: 메뉴 막대 → 달리기 기준에서 CPU, 메모리, GPU 중에 고릅니다 (기본 CPU).
+Clawd 아이콘을 누르면 나오는 메뉴에서:
+- Claude 상태, Mac 상태(CPU·GPU·메모리·저장 공간·배터리·네트워크)를 한눈에 봅니다.
+- 완료 알림 모두 확인, 💡 아이디어 목록, 간식 주기, Clawd 추가/빼기
+- 달리기 기준(CPU·메모리·GPU), 메뉴 막대에서 돌아다니기, Touch Bar 관련 설정, 종료
 
-밝기·소리 버튼 옆 대시보드는 5초마다 넘어가고, 톡 치면 바로 넘어갑니다.
+---
 
-| 페이지 | 내용 |
+## 💡 아이디어 리서치 루틴 만들기 (선택)
+
+몇 시간마다 Claude가 트렌드를 리서치해서 내 브랜드·채널에 맞는 아이디어를 만들고, Clawd가 하나씩 던져 줍니다.
+[`routines/아이디어-리서치.md`](routines/아이디어-리서치.md)의 템플릿에서 `[대괄호]`만 내 상황에 맞게 바꾼 뒤,
+Claude 앱에서 "이 내용으로 3시간마다 도는 예약 작업 만들어 줘"라고 하면 됩니다.
+
+- 보고서는 정한 폴더에 쌓이고, 아이디어 목록은 `~/.clawd-touchbar/ideas.json`에 들어갑니다.
+- 인스타 같은 SNS의 조회·공유·저장 수치는 로그인 없이 대부분 볼 수 없어서, 공개된 자료의 수치만 출처와 함께 씁니다.
+
+---
+
+## 업데이트 받기
+
+```bash
+cd ~/Documents/ClaudeTouchBar && git pull && ./install.sh
+```
+
+## 지우기
+
+```bash
+cd ~/Documents/ClaudeTouchBar && ./uninstall.sh
+```
+
+앱을 끄고, Claude Code 연결을 풀고, `~/Applications`의 앱을 지웁니다. 내가 쓰던 다른 Claude Code 설정은 그대로 둡니다.
+
+---
+
+## 문제가 있을 때
+
+| 증상 | 해결 |
 |---|---|
-| 시스템 | CPU 사용률, 사용 중인 메모리 |
-| GPU·저장 공간 | GPU 사용률, SSD 남은 용량 (막대는 사용 비율) |
-| 전원·네트워크 | 배터리(⚡ 충전 중), 초당 내려받기·올리기 |
-| Claude | 5시간·7일 사용 한도 (없으면 컨텍스트 사용량) |
+| Clawd가 Claude를 따라 일하지 않아요 | Claude Code 세션을 **새로** 시작하세요. 이미 열려 있던 세션은 연결 전 설정을 쓰고 있습니다. |
+| 메뉴 막대에 Clawd가 안 보여요 | 메뉴 → "메뉴 막대에서 돌아다니기"가 켜져 있는지, 메뉴 막대 자동 숨김을 쓰고 있지 않은지 확인하세요. |
+| Touch Bar에 안 나와요 | 메뉴 → "Touch Bar에 보이기"를 누르세요. Touch Bar 왼쪽 ✕로 닫았을 수 있습니다. |
+| 완료 알림이 계속 떠 있어요 | 일부러 그렇게 만들었습니다. Clawd나 말풍선을 클릭하거나, 메뉴 → "완료 알림 모두 확인"을 누르세요. |
+| Claude 사용량(5시간·7일)이 안 나와요 | 이 정보는 터미널의 Claude Code(CLI) 상태줄에서만 들어옵니다. 데스크톱 앱만 쓰면 나오지 않습니다. |
+| `./install.sh`가 권한 오류를 내요 | `chmod +x install.sh uninstall.sh build.sh hooks/*.sh` 후 다시 실행하세요. |
 
-막대가 빨갛게 바뀌면 위험 신호입니다(CPU·GPU·SSD·사용량은 85% 넘게, 배터리는 20% 아래).
-메뉴 막대 메뉴를 열면 모든 수치를 한눈에 볼 수 있고, 대시보드를 끌 수도 있습니다.
+---
 
-Claude 사용량은 Claude Code의 `statusLine`(`hooks/clawd-statusline.sh`)에서 받아 옵니다.
-터미널에서 Claude Code(CLI)를 쓸 때만 들어오는 정보라서, Claude 데스크톱 앱만 쓰면 이 페이지는 나타나지 않습니다.
-CLI 상태줄에는 모델 이름이 표시됩니다.
+## 함께 개발하기
 
-## 💡 아이디어
+코드는 GitHub 저장소로 공유합니다. 각자 자기 맥에 받아서 자기 Claude와 작업하고, 바뀐 내용을 GitHub로 주고받습니다.
 
-예약 작업 **"디놈들 릴스 트렌드 아이디어 (3시간마다)"**가 9·12·15·18·21시에 실행됩니다.
-Claude 앱이 켜져 있을 때 실행되고, 꺼져 있었으면 다음에 켤 때 실행됩니다. 관리는 Claude 앱 사이드바의 "Scheduled"에서 합니다.
+- **시작 전**: `git pull`로 다른 사람 변경을 받고 `./install.sh`
+- **작업 후**: 작은 단위로 자주 커밋하고 `git push`. Claude에게 "올려 줘", "받아 줘"라고 해도 됩니다.
+- 같은 파일을 동시에 크게 고치면 충돌이 나기 쉬우니 파일을 나눠 맡으세요(아래 표 참고). 충돌이 나면 Claude에게 "충돌 해결해 줘"라고 하면 됩니다.
+- 한 화면에서 같이 고치고 싶으면 VS Code의 **Live Share** 확장을 쓰면 됩니다.
 
-1. 미국 인스타 릴스에서 기발하고 공유·저장 반응이 좋은 콘텐츠를 웹에서 리서치합니다.
-2. 디놈들 자료(올린 카드뉴스 캡션, 미팅 브리핑)를 참고해 디놈들 아이디어 3개를 만들고, 최근 다른 Claude 작업 주제로도 1개씩 만듭니다.
-3. 보고서를 `03_업무프로젝트/디놈들/아이디어 리서치/`에 저장하고, 아이디어 목록을 `~/.clawd-touchbar/ideas.json`에 남깁니다.
+| 파일 | 하는 일 |
+|---|---|
+| `Sources/Clawd.swift` | Clawd 한 마리의 행동, 기분, 표정 |
+| `Sources/ClawdSprite.swift` | 픽셀 그림 (몸, 눈, 책·노트북·아령·팻말, 숫자 글꼴) |
+| `Sources/Playground.swift` | Clawd들이 사는 세계 (간식, 시계 담당, 아이디어 던지기) |
+| `Sources/PlaygroundView.swift` | 그리기, 말풍선, 클릭·터치 |
+| `Sources/MenuBarPet.swift` | 메뉴 막대 위 투명 창 |
+| `Sources/ClaudeLink.swift`, `Transcript.swift` | Claude Code 훅 이벤트 읽기, 세션 상태·주제·완료 요약 |
+| `Sources/IdeaBox.swift` | 💡 아이디어 목록 |
+| `Sources/SystemStats.swift`, `Runner.swift`, `MetricsView.swift` | Mac 상태, RunCat 달리기, Touch Bar 대시보드 |
+| `Sources/SystemControls.swift` | 밝기·볼륨 조절 |
+| `Sources/App.swift`, `TouchBarPrivate.swift` | 앱 시작, 메뉴, Touch Bar 띄우기 |
+| `hooks/` | Claude Code 훅·상태줄 스크립트, 설정 연결 스크립트 |
 
-Touch Bar에서는 놀고 있는 Clawd가 가끔(25~45분마다, 새 아이디어가 오면 곧바로) 폴짝 뛰며 `💡 아이디어! 디놈들 · …` 말풍선으로 하나씩 던집니다.
-그 주제를 다뤘던 Clawd가 먼저 나서고, **톡 치면 보고서가 열립니다**. 그냥 지나간 아이디어는 나중에 다시 던집니다(최대 3번).
-메뉴 막대 → 💡 아이디어에서 최근 아이디어(● = 아직 안 봄)를 보고, "지금 하나 던져 줘"로 바로 받을 수도 있습니다.
+각자 맥에만 있는 것 (저장소에 들어가지 않음): `~/.claude/settings.json`의 연결 설정, `~/.clawd-touchbar/`(Claude 상태·아이디어·완료 알림), 아이디어 예약 작업.
 
-인스타 조회·공유·저장 수치는 로그인 없이 대부분 볼 수 없어서, 공개된 기사·트렌드 리포트에 나온 수치만 출처와 함께 씁니다.
-
-## 시계
-
-놀고 있는 Clawd가 둘 이상이면 그중 한 마리가 **시계 팻말**을 머리 위로 들고 서 있거나 천천히 걸어 다닙니다.
-혼자 놀 때는 놀다가 가끔 시계를 들어 보여 줍니다. 팻말의 `:`는 1초마다 깜빡이고, 시스템 설정에 따라 12시간/24시간으로 표시합니다.
-정각이 되면 "땡!" 하고 좋아합니다. 시계 담당이 Claude 일을 맡게 되면 남은 Clawd 중 한 마리가 시계를 이어받습니다.
-
-## 같이 놀기
-
-- **빈 곳을 터치하면** ✻ 간식이 떨어지고, Clawd가 달려가서 먹은 뒤 하트를 띄웁니다 (일하는 중에는 한눈팔지 않아요)
-- **Clawd를 톡 치면** 기뻐하고, 자고 있었다면 깜짝 놀라 깹니다
-- **Clawd를 누른 채 옆으로 끌면** 들어 올려서 옮길 수 있고, 손을 떼면 떨어집니다
-
-## 빌드와 실행
-
-Xcode Command Line Tools가 필요합니다. 설치돼 있지 않다면 아래 명령으로 먼저 설치하세요.
+개발할 때 쓸 수 있는 옵션:
 
 ```bash
-xcode-select --install
+./build.sh && open build/ClawdTouchBar.app                               # 고친 뒤 바로 띄워 보기
+build/ClawdTouchBar.app/Contents/MacOS/ClawdTouchBar --preview           # Touch Bar 대신 일반 창에서 미리보기
+build/ClawdTouchBar.app/Contents/MacOS/ClawdTouchBar --snapshot out.png  # 여러 장면을 PNG 한 장으로
 ```
 
-처음 받았다면 설치 스크립트를 한 번 실행하세요. 빌드하고, 내 Claude Code(`~/.claude/settings.json`)에 훅과 상태줄을 연결한 뒤 앱을 띄웁니다.
-기존 설정은 그대로 두고, 바꾸기 전 원본은 `settings.json.bak-clawd`로 남깁니다.
-
-```bash
-./install.sh
-```
-
-코드를 고친 뒤에는 다시 빌드해서 띄우면 됩니다.
-
-```bash
-./build.sh && open build/ClawdTouchBar.app
-```
-
-실행하면 Touch Bar에 Clawd가 나타나고, 메뉴 막대와 Control Strip에 작은 Clawd 아이콘이 생깁니다.
-
-- **Control Strip의 Clawd 버튼**: 놀이터를 열거나 닫습니다
-- **Touch Bar 왼쪽 esc 자리**: 놀이터가 떠 있는 동안에는 esc 대신 닫기(✕) 버튼이 나옵니다.
-- **메뉴 막대 아이콘**: Claude 상태 보기, 간식 주기, Clawd 추가/빼기(최대 6마리), 크게 보기, 넓게 쓰기(Control Strip까지 덮기), 종료
-
-Touch Bar 설정이 "확장된 Control Strip"이면 앱 영역이 없어서 Touch Bar 전체를 덮는 방식으로 자동 전환되고, Control Strip 버튼도 보이지 않습니다. 이때는 메뉴 막대 아이콘으로 켜고 끄세요.
-
-Touch Bar 전체를 덮을 때는 오른쪽에 **밝기 −/+ · 음소거 · 볼륨 −/+** 버튼이 함께 붙습니다. 누르고 있으면 계속 조절되고, 조절하면 Touch Bar에 16칸짜리 레벨 표시가 잠깐 뜹니다. 메뉴의 "밝기·소리 버튼"으로 끌 수 있습니다.
-(시스템 화면 가운데의 볼륨·밝기 표시는 뜨지 않습니다. 키 입력을 흉내 내지 않고 직접 조절해서 손쉬운 사용 권한이 필요 없는 대신입니다.)
-
-로그인할 때 자동으로 실행하려면 `build/ClawdTouchBar.app`을 `/Applications`로 옮기고
-**시스템 설정 → 일반 → 로그인 항목**에 추가하세요.
-
-## 동료와 함께 개발하기
-
-코드는 GitHub 비공개 저장소로 공유합니다. 각자 자기 맥에 받아서 자기 Claude와 작업하고, 바뀐 내용을 GitHub로 주고받습니다.
-
-1. **처음 한 번 (공유하는 사람)**: [GitHub Desktop](https://desktop.github.com)에 로그인 → File → Add Local Repository → 이 폴더 선택 → 저장소 만들기 → Publish repository (**Keep this code private** 체크) → github.com의 저장소 Settings → Collaborators에서 동료 초대
-2. **처음 한 번 (동료)**: 초대 메일에서 수락 → 터미널에서 아래 명령 (또는 GitHub Desktop에서 Clone 후 `./install.sh`)
-
-   ```bash
-   xcode-select --install   # 개발 도구가 없을 때만
-   git clone https://github.com/suinegyzal/clawd-touchbar.git ~/Documents/ClaudeTouchBar && cd ~/Documents/ClaudeTouchBar && ./install.sh
-   ```
-3. **평소**: 작업 시작 전에 **Fetch/Pull**로 동료 변경을 받고, 작은 단위로 자주 **Commit → Push** 합니다.
-
-같이 작업할 때 요령:
-- 같은 파일을 동시에 크게 고치면 충돌이 나기 쉽습니다. 누가 어느 파일(예: 캐릭터 동작은 `Clawd.swift`, 대시보드는 `MetricsView.swift`)을 맡을지 나누면 편합니다.
-- 큰 기능은 브랜치를 따로 만들어 작업하고 Pull Request로 합칩니다. 충돌이 나면 Claude에게 "충돌 해결해 줘"라고 하면 됩니다.
-- 한 화면에서 같이 코드를 고치고 싶을 땐 VS Code의 **Live Share** 확장으로 한 사람의 폴더에 다른 사람이 들어와 실시간으로 같이 편집할 수 있습니다.
-
-각자 맥에 따로 있는 것 (저장소에 들어가지 않음):
-- `~/.claude/settings.json`의 훅 설정 → `./install.sh`가 각자 경로에 맞게 넣어 줍니다.
-- `~/.clawd-touchbar/` (Claude 상태, 아이디어, 완료 알림) → Touch Bar에는 **각자 자기 Claude**의 상태가 나옵니다.
-- 💡 아이디어 리서치 예약 작업 → 필요한 사람이 각자 Claude 앱에서 만듭니다.
-
-## 개발용 옵션
-
-```bash
-# Touch Bar 대신 일반 창에서 미리보기 (마우스로 클릭/드래그)
-build/ClawdTouchBar.app/Contents/MacOS/ClawdTouchBar --preview
-
-# 여러 장면을 PNG 한 장으로 렌더링
-build/ClawdTouchBar.app/Contents/MacOS/ClawdTouchBar --snapshot snapshot.png
-```
+---
 
 ## 참고
 
-앱이 앞에 있지 않아도 Touch Bar를 쓰기 위해 macOS 비공개 API(`DFRFoundation`, `presentSystemModalTouchBar`)를 사용합니다.
-MTMR, Pock 같은 Touch Bar 앱들과 같은 방식입니다. 개인용으로는 문제없지만 App Store에는 올릴 수 없습니다.
+- 앱이 앞에 있지 않아도 Touch Bar를 쓰기 위해, 그리고 내장 화면 밝기를 조절하기 위해 macOS 비공개 API(`DFRFoundation`, `DisplayServices`)를 씁니다. MTMR, Pock, MonitorControl 같은 앱들과 같은 방식이라 개인용으로는 문제없지만 App Store에는 올릴 수 없습니다.
+- 훅은 앱이 꺼져 있으면 아무것도 하지 않고, Claude Code의 동작을 막지 않습니다.
+- Clawd와 Claude는 Anthropic의 캐릭터·상표입니다. 이 앱은 개인 프로젝트이며 Anthropic과 관련이 없습니다.

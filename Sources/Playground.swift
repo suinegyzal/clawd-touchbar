@@ -35,7 +35,7 @@ struct Particle {
 
 /// Touch Bar 위의 작은 세계: Clawd들, 간식, 파티클.
 final class Playground {
-    let height: CGFloat = 30
+    var height: CGFloat = 30
     var width: CGFloat = 685 {
         didSet { if width != oldValue { clampEverything() } }
     }
@@ -46,6 +46,9 @@ final class Playground {
 
     /// Mac이 얼마나 바쁜지 (0...1, 기준은 CPU·메모리·GPU 중 고른 것). RunCat처럼 바쁠수록 Clawd가 빨리 달린다.
     var busy = 0.0
+
+    /// 메뉴 막대처럼 다른 화면 위에 겹쳐 그릴 때: 검은 바탕 없이, 글자엔 어두운 받침
+    var transparent = false
 
     /// Claude Code 훅과의 연결. 없으면 그냥 자유롭게 논다.
     var link: ClaudeLink?

@@ -52,10 +52,21 @@ final class IdeaBox {
         }
     }
 
-    /// 던질 때가 됐으면 아직 안 본 아이디어 하나
+    /// 지금 던지고 있는 아이디어. Touch Bar와 메뉴 막대가 같은 걸 같이 던진다.
+    private(set) var current: Idea?
+    private var currentUntil = Date.distantPast
+    private var pitchSerial = 0
+    private var countedSerial = -1
+
+    /// 던질 때가 됐으면 아직 안 본 아이디어 하나 (다른 곳에서 막 던졌으면 그것)
     func due(now: Date = Date()) -> Idea? {
+        if let current, now < currentUntil, !seen.contains(current.id) { return current }
+        current = nil
         guard now >= nextPitch, let idea = unseen.first(where: { (shownCount[$0.id] ?? 0) < 3 }) else { return nil }
         nextPitch = now.addingTimeInterval(.random(in: 25 * 60...45 * 60))
+        current = idea
+        currentUntil = now.addingTimeInterval(40)
+        pitchSerial += 1
         return idea
     }
 
@@ -66,11 +77,15 @@ final class IdeaBox {
 
     /// 말풍선이 그냥 지나갔다. 세 번 지나가면 본 것으로 친다.
     func shown(_ idea: Idea) {
+        // 양쪽에서 같이 던졌어도 한 번으로 센다
+        guard countedSerial != pitchSerial else { return }
+        countedSerial = pitchSerial
         shownCount[idea.id, default: 0] += 1
         if shownCount[idea.id, default: 0] >= 3 { markSeen(idea) }
     }
 
     func markSeen(_ idea: Idea) {
+        if current?.id == idea.id { current = nil }
         seen.insert(idea.id)
         UserDefaults.standard.set(Array(seen.suffix(300)), forKey: Self.seenKey)
     }
