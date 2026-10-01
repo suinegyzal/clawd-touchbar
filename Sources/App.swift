@@ -9,6 +9,7 @@ enum Main {
             return
         }
         let app = NSApplication.shared
+        if args.contains("--desktop") { UserDefaults.standard.set(true, forKey: "desktopMode") }
         let delegate = AppDelegate(preview: args.contains("--preview"))
         app.delegate = delegate
         app.setActivationPolicy(.accessory)
@@ -25,6 +26,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTouchBarDelegate, NS
         static let metrics = "showMetrics"
         static let source = "runnerSource"
         static let menuBarPet = "menuBarPet"
+        static let desktop = "desktopMode"
     }
     private static let barID = NSTouchBarItem.Identifier("com.local.ClaudeTouchBar.playground")
     private static let trayID = NSTouchBarItem.Identifier("com.local.ClaudeTouchBar.tray")
@@ -52,6 +54,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTouchBarDelegate, NS
     private var trayItem: NSCustomTouchBarItem?
     private var statusItem: NSStatusItem?
     private var previewWindow: NSWindow?
+    /// 화면 위 모드(Touch Bar 없는 맥): 떠다니는 Clawd 창들
+    private var petWindows: [PetWindow] = []
+    private var desktopItem: NSMenuItem!
     private var isShowing = false
     private var muteButton: NSButton?
 
@@ -80,6 +85,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTouchBarDelegate, NS
         get { min(max(defaults.integer(forKey: Key.count), 1), Self.maxPets) }
         set { defaults.set(newValue, forKey: Key.count) }
     }
+    private var desktopMode: Bool {
+        get { defaults.bool(forKey: Key.desktop) }
+        set { defaults.set(newValue, forKey: Key.desktop) }
+    }
+    private var desktopPixel: CGFloat { big ? 4 : 3 }
     private var big: Bool {
         get { defaults.bool(forKey: Key.big) }
         set { defaults.set(newValue, forKey: Key.big) }
@@ -142,8 +152,40 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTouchBarDelegate, NS
 
         if previewMode {
             showPreviewWindow()
+        } else if desktopMode {
+            showDesktop()
         } else {
             installTrayItem()
+            showOnTouchBar()
+        }
+    }
+
+    // MARK: - 화면 위 모드
+
+    private func showDesktop() {
+        while petWindows.count < petCount { addPetWindow() }
+    }
+
+    private func hideDesktop() {
+        for w in petWindows { w.close() }
+        petWindows = []
+    }
+
+    private func addPetWindow() {
+        let w = PetWindow(px: desktopPixel, link: world.link, slot: petWindows.count)
+        w.world.busy = world.busy
+        if petWindows.isEmpty { w.world.ideas = world.ideas }   // 아이디어는 한 마리만 던진다
+        petWindows.append(w)
+    }
+
+    @objc private func toggleDesktop() {
+        desktopMode.toggle()
+        if desktopMode {
+            if isShowing { hideFromTouchBar() }
+            showDesktop()
+        } else {
+            hideDesktop()
+            if trayItem == nil { installTrayItem() }
             showOnTouchBar()
         }
     }
@@ -163,6 +205,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTouchBarDelegate, NS
             self.stats.sample()
             let busy = self.stats.value(for: self.runnerSource)
             self.world.busy = busy
+            for w in self.petWindows { w.world.busy = busy }
             self.metricsView.busy = busy
             self.menuBarPet?.world.busy = busy
             self.metricsView.tick()
@@ -328,6 +371,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTouchBarDelegate, NS
         sourceItem.submenu = sourceMenu
         menu.addItem(.separator())
         showItem = menu.addItem(withTitle: "Touch Bar에 보이기", action: #selector(toggleTouchBar), keyEquivalent: "")
+        desktopItem = menu.addItem(withTitle: "화면 위에 띄우기 (Touch Bar 없이)", action: #selector(toggleDesktop), keyEquivalent: "")
         menu.addItem(.separator())
         menu.addItem(withTitle: "완료 알림 모두 확인", action: #selector(acknowledgeAll), keyEquivalent: "")
         menu.addItem(withTitle: "💡 아이디어", action: nil, keyEquivalent: "").submenu = ideasMenu
@@ -351,7 +395,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTouchBarDelegate, NS
     func menuNeedsUpdate(_ menu: NSMenu) {
         guard menu !== ideasMenu else { return }
         rebuildIdeasMenu()
-        countItem.title = "Clawd × \(world.pets.count)"
+        countItem.title = "Clawd × \(desktopMode ? petWindows.count : world.pets.count)"
         linkItem.title = world.link?.summaryLine ?? ""
         func percent(_ value: Double) -> Int { Int((value * 100).rounded()) }
         var lines = [
@@ -374,8 +418,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTouchBarDelegate, NS
             choice.state = choice.representedObject as? String == runnerSource.rawValue ? .on : .off
         }
         showItem.state = isShowing || previewMode ? .on : .off
-        addItem.isEnabled = world.pets.count < Self.maxPets
-        removeItem.isEnabled = world.pets.count > 1
+        showItem.isEnabled = !desktopMode
+        desktopItem.state = desktopMode ? .on : .off
+        desktopItem.isEnabled = !previewMode
+        let count = desktopMode ? petWindows.count : world.pets.count
+        addItem.isEnabled = count < Self.maxPets
+        removeItem.isEnabled = count > 1
         bigItem.state = big ? .on : .off
         wideItem.state = useWide ? .on : .off
         wideItem.isEnabled = !previewMode && !controlStripOnly
@@ -418,6 +466,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTouchBarDelegate, NS
     }
 
     @objc private func pitchIdea() {
+        if desktopMode { petWindows.first?.world.pitchIdeaNow(); return }
         if !isShowing && !previewMode { showOnTouchBar() }
         world.pitchIdeaNow()
         menuBarPet?.world.pitchIdeaNow()
@@ -433,12 +482,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTouchBarDelegate, NS
     }
 
     @objc private func dropTreat() {
+        if desktopMode { petWindows.randomElement()?.world.dropTreat(); return }
         if !isShowing && !previewMode { showOnTouchBar() }
         world.dropTreat()
         menuBarPet?.world.dropTreat()
     }
 
     @objc private func addPet() {
+        if desktopMode {
+            guard petWindows.count < Self.maxPets else { return }
+            addPetWindow()
+            petCount = petWindows.count
+            return
+        }
         guard world.pets.count < Self.maxPets else { return }
         world.addPet()
         petCount = world.pets.count
@@ -447,6 +503,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTouchBarDelegate, NS
     }
 
     @objc private func removePet() {
+        if desktopMode {
+            guard petWindows.count > 1 else { return }
+            petWindows.removeLast().close()
+            petCount = petWindows.count
+            return
+        }
         guard world.pets.count > 1 else { return }
         world.setPetCount(world.pets.count - 1)
         petCount = world.pets.count
@@ -457,6 +519,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTouchBarDelegate, NS
     @objc private func toggleBig() {
         big.toggle()
         world.px = big ? 2 : 1.5
+        for w in petWindows { w.setPixel(desktopPixel) }
     }
 
     @objc private func chooseSource(_ sender: NSMenuItem) {

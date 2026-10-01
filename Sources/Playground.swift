@@ -52,6 +52,8 @@ final class Playground {
 
     /// Claude Code 훅과의 연결. 없으면 그냥 자유롭게 논다.
     var link: ClaudeLink?
+    /// 세계가 여럿일 때(화면 위 모드) 이 세계가 맡는 세션 순번의 시작
+    var sessionOffset = 0
     private var pollIn = 0.0
     private let startedAt = Date()
 
@@ -198,6 +200,13 @@ final class Playground {
         }
     }
 
+    /// 세계 안의 모든 것을 옆으로 옮긴다 (화면 위 모드에서 Clawd를 창 가운데에 두기 위해)
+    func shift(by dx: CGFloat) {
+        for pet in pets { pet.x -= dx }
+        for treat in treats { treat.x -= dx }
+        for i in particles.indices { particles[i].x -= dx }
+    }
+
     private func clampEverything() {
         for pet in pets { pet.x = min(max(pet.x, minX), maxX) }
         for treat in treats { treat.x = min(max(treat.x, 5), max(5, width - 5)) }
@@ -225,7 +234,7 @@ final class Playground {
             link.poll()
             let sessions = link.active
             for (i, pet) in pets.enumerated() {
-                pet.assign(i < sessions.count ? sessions[i] : nil, in: self)
+                pet.assign(i + sessionOffset < sessions.count ? sessions[i + sessionOffset] : nil, in: self)
             }
         }
         ideaIn -= dt

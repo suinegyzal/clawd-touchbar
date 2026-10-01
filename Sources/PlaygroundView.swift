@@ -259,6 +259,8 @@ final class PlaygroundView: NSView {
     private lazy var widthCap = widthAnchor.constraint(lessThanOrEqualToConstant: preferredWidth)
     /// Touch Bar에 붙었다/떨어졌다를 알려준다 (닫기 버튼으로 내려간 경우 포함)
     var onVisibilityChange: ((Bool) -> Void)?
+    /// 화면 위 모드: 매 프레임 세계를 갱신한 뒤 창을 옮길 수 있게 알려 준다
+    var onTick: (() -> Void)?
 
     private var timer: Timer?
     private var lastTick: CFTimeInterval = 0
@@ -299,6 +301,8 @@ final class PlaygroundView: NSView {
         }
     }
     override var acceptsFirstResponder: Bool { true }
+    /// 다른 앱을 쓰다가 바로 눌러도 첫 클릭이 Clawd에게 간다
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
 
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
@@ -338,6 +342,7 @@ final class PlaygroundView: NSView {
         lastTick = now
         if bounds.width > 40 { world.width = bounds.width }
         world.update(dt)
+        onTick?()
         needsDisplay = true
         if world.transparent { updateClickThrough() }
     }
