@@ -226,6 +226,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTouchBarDelegate, NS
 
     private func addPetWindow() {
         let w = PetWindow(px: desktopPixel, link: world.link, slot: petWindows.count)
+        w.onAddPet = { [weak self] in self?.addPet() }
+        w.onRemovePet = { [weak self] w in
+            guard let self, self.petWindows.count > 1, let i = self.petWindows.firstIndex(where: { $0 === w }) else { return }
+            self.petWindows.remove(at: i).close()
+            for (slot, rest) in self.petWindows.enumerated() { rest.world.sessionOffset = slot }
+            self.petCount = self.petWindows.count
+        }
         w.world.busy = world.busy
         if petWindows.isEmpty { w.world.ideas = world.ideas }   // 아이디어는 한 마리만 던진다
         petWindows.append(w)

@@ -261,6 +261,8 @@ final class PlaygroundView: NSView {
     var onVisibilityChange: ((Bool) -> Void)?
     /// 화면 위 모드: 매 프레임 세계를 갱신한 뒤 창을 옮길 수 있게 알려 준다
     var onTick: (() -> Void)?
+    /// Clawd를 오른쪽 클릭했을 때 (화면 위 모드의 메뉴)
+    var onContextMenu: ((Clawd, NSEvent) -> Void)?
 
     private var timer: Timer?
     private var lastTick: CFTimeInterval = 0
@@ -417,5 +419,13 @@ final class PlaygroundView: NSView {
 
     override func mouseUp(with event: NSEvent) {
         lift("mouse")
+    }
+
+    override func rightMouseDown(with event: NSEvent) {
+        if let pet = world.pet(at: convert(event.locationInWindow, from: nil).x), let onContextMenu {
+            onContextMenu(pet, event)
+        } else {
+            super.rightMouseDown(with: event)
+        }
     }
 }

@@ -5,7 +5,7 @@ import AppKit
 /// 투명한 창 하나에 작은 놀이터(Playground)를 넣고, Clawd는 늘 창 가운데에 둔다.
 /// Clawd가 걸으면 그만큼 창이 화면에서 움직이고, 창 자체는 천천히 위아래로 떠다닌다.
 /// 빈 곳은 클릭이 아래 창으로 통과하고, Clawd나 말풍선 위에서만 잡힌다 (Playground.transparent, 메뉴 막대 Clawd와 같은 방식).
-final class PetWindow {
+final class PetWindow: NSObject {
     static let worldWidth: CGFloat = 480
 
     let world = Playground()
@@ -17,6 +17,11 @@ final class PetWindow {
     private var retargetIn = 0.0
     private var bob = Double.random(in: 0...6)
     private var heldMouseY: CGFloat?
+    private var cursorAwayFor = 10.0
+
+    /// 메뉴의 "한 마리 더" / "보내기"
+    var onAddPet: (() -> Void)?
+    var onRemovePet: ((PetWindow) -> Void)?
 
     init(px: CGFloat, link: ClaudeLink?, slot: Int) {
         world.transparent = true
@@ -51,11 +56,39 @@ final class PetWindow {
         window.setFrameOrigin(NSPoint(x: .random(in: area.minX...max(area.minX, area.maxX - size.width)),
                                       y: .random(in: area.minY...max(area.minY, area.maxY - size.height))))
         targetY = window.frame.minY
+        super.init()
         view.onTick = { [weak self] in self?.tick() }
+        view.onContextMenu = { [weak self] _, event in self?.showMenu(event) }
         window.orderFrontRegardless()
     }
 
     var pet: Clawd { world.pets[0] }
+
+    // MARK: - 오른쪽 클릭 메뉴
+
+    private func showMenu(_ event: NSEvent) {
+        let menu = NSMenu()
+        menu.autoenablesItems = false
+        for (title, action) in [("간식 주기 ✻", #selector(giveTreat)), ("쓰다듬기 ♥", #selector(patPet))] {
+            menu.addItem(withTitle: title, action: action, keyEquivalent: "").target = self
+        }
+        menu.addItem(.separator())
+        menu.addItem(withTitle: "Clawd 한 마리 더", action: #selector(addPet), keyEquivalent: "").target = self
+        let bye = menu.addItem(withTitle: "이 Clawd 보내기", action: #selector(removePet), keyEquivalent: "")
+        bye.target = self
+        bye.isEnabled = onRemovePet != nil
+        NSMenu.popUpContextMenu(menu, with: event, for: view)
+    }
+
+    /// 간식은 Clawd 옆 조금 떨어진 곳에 떨어뜨려서 달려가 먹게 한다
+    @objc private func giveTreat() {
+        let side: CGFloat = Bool.random() ? 1 : -1
+        world.dropTreat(at: pet.x + side * .random(in: 70...150))
+    }
+
+    @objc private func patPet() { pet.pat(in: world) }
+    @objc private func addPet() { onAddPet?() }
+    @objc private func removePet() { onRemovePet?(self) }
 
     func close() {
         view.onTick = nil
@@ -110,6 +143,20 @@ final class PetWindow {
             heldMouseY = mouseY
         } else {
             heldMouseY = nil
+        }
+        // 마우스가 다가오면 쳐다보고, 오랜만이면 손을 흔든다
+        let mouse = NSEvent.mouseLocation
+        if window.frame.insetBy(dx: -60, dy: -60).contains(mouse) {
+            let local = view.convert(window.convertPoint(fromScreen: mouse), from: nil)
+            if abs(local.x - pet.x) < 160 {
+                if cursorAwayFor > 4 { pet.wave() }
+                cursorAwayFor = 0
+                pet.watch(cursorAt: local.x - pet.x)
+            } else {
+                cursorAwayFor += Double(dt)
+            }
+        } else {
+            cursorAwayFor += Double(dt)
         }
         bob += Double(dt)
         frame.origin.y += CGFloat(sin(bob * 1.4)) * 0.08

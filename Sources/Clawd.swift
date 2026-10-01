@@ -554,6 +554,30 @@ final class Clawd {
         }
     }
 
+    // MARK: - 화면 위 모드에서 사람과 놀기
+
+    private var freeToPlay: Bool { job == nil && [.idle, .rest, .walk, .clock].contains(activity) }
+
+    /// 가까이 온 마우스를 쳐다본다 (놀고 있을 때만, 걷는 중엔 방향을 바꾸지 않는다)
+    func watch(cursorAt dx: CGFloat) {
+        guard freeToPlay, activity != .walk, abs(dx) > 4 else { return }
+        look = dx > 0 ? 1 : -1
+    }
+
+    /// 오랜만에 마우스가 다가오면 손을 흔든다
+    func wave() {
+        guard freeToPlay else { return }
+        happyFor = 1
+        begin(.cheer, for: 0.8...1.1)
+    }
+
+    /// 쓰다듬기: 뛰지 않고 좋아하기만 한다 (자고 있어도 깨우지 않는다)
+    func pat(in world: Playground) {
+        guard activity != .held, activity != .fall else { return }
+        happyFor = 1.2
+        heart(in: world)
+    }
+
     func grab(in world: Playground) {
         activity = .held
         target = nil
