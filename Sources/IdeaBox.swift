@@ -42,7 +42,7 @@ final class IdeaBox {
         let iso = ISO8601DateFormatter()
         ideas = list.compactMap { item in
             guard let id = item["id"] as? String, let title = item["title"] as? String, !title.isEmpty else { return nil }
-            return Idea(id: id, topic: item["topic"] as? String ?? "아이디어", title: title,
+            return Idea(id: id, topic: item["topic"] as? String ?? tr("아이디어", "Idea"), title: title,
                         detail: item["detail"] as? String ?? "", report: item["report"] as? String,
                         created: (item["created"] as? String).flatMap { iso.date(from: $0) })
         }

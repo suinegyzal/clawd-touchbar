@@ -272,15 +272,15 @@ final class Clawd {
             moodIn = .random(in: 3...5)
             let side: CGFloat = Bool.random() ? 1 : -1
             world.emit(.sweat, x: x + side * world.px * 7, y: top - world.px * 2, vx: side * 10, vy: 14, life: 0.6)
-            if Double.random(in: 0..<1) < 0.3 { say(["휴…", "하아…", "좀 걸리네…"]) }
+            if Double.random(in: 0..<1) < 0.3 { say(tr(["휴…", "하아…", "좀 걸리네…"], ["Phew…", "Sigh…", "Taking a while…"])) }
         case .annoyed:
             moodIn = .random(in: 1.2...2)
             steam(world, top: top)
-            if Double.random(in: 0..<1) < 0.2 { say(["으으…", "아직이야?", "왜 이렇게 오래 걸려…"]) }
+            if Double.random(in: 0..<1) < 0.2 { say(tr(["으으…", "아직이야?", "왜 이렇게 오래 걸려…"], ["Ugh…", "Still going?", "Why so long…"])) }
         case .furious:
             moodIn = .random(in: 0.5...0.9)
             steam(world, top: top)
-            if Double.random(in: 0..<1) < 0.12 { say(["언제 끝나!", "으아악!", "너무 오래 걸려!", "빨리빨리!"]) }
+            if Double.random(in: 0..<1) < 0.12 { say(tr(["언제 끝나!", "으아악!", "너무 오래 걸려!", "빨리빨리!"], ["When will it end?!", "Argh!", "Way too long!", "Hurry up!"])) }
             // 서 있을 땐 발을 구른다
             if !frame.sitting && !isAirborne && Double.random(in: 0..<1) < 0.15 { vy = world.jumpVelocity(0.25) }
         }
@@ -388,7 +388,7 @@ final class Clawd {
 
     private func yawn(_ world: Playground) {
         yawnFor = 1.3
-        world.emit(.text("하암…", Palette.text, 8), x: x + facing * world.px * 7, y: world.spriteHeight - world.px * 3,
+        world.emit(.text(tr("하암…", "Yawn…"), Palette.text, 8), x: x + facing * world.px * 7, y: world.spriteHeight - world.px * 3,
                    vx: facing * 4, vy: 7, life: 1.4)
     }
 
@@ -471,25 +471,25 @@ final class Clawd {
             switch work {
             case .think:
                 begin(.think, for: forever)
-                label = "생각 중" + (detail.isEmpty ? "…" : suffix)
+                label = tr("생각 중", "Thinking") + (detail.isEmpty ? "…" : suffix)
             case .study:
                 begin(.study, for: forever)
-                label = "공부 중" + suffix
+                label = tr("공부 중", "Studying") + suffix
             case .exercise:
                 begin(.exercise, for: forever)
-                label = "운동 중" + suffix
+                label = tr("운동 중", "Working out") + suffix
                 sweatIn = 0.5
             case .craft:
                 begin(.craft, for: forever)
-                label = "작업 중" + suffix
+                label = tr("작업 중", "Working") + suffix
             }
         case .waiting(let message):
             begin(.call, for: forever)
-            speech = Speech(title: "잠깐!", text: message)
+            speech = Speech(title: tr("잠깐!", "Wait!"), text: message)
             exclaim("!", in: world)
         case .done(let summary):
             begin(.announce, for: forever)
-            speech = Speech(title: "완료!", text: summary)
+            speech = Speech(title: tr("완료!", "Done!"), text: summary)
             happyFor = 2
             if !isAirborne { vy = world.jumpVelocity(0.9) }
             heart(in: world)
@@ -678,7 +678,7 @@ final class Clawd {
     func pitch(_ idea: IdeaBox.Idea, in world: Playground) {
         pitchedIdea = idea
         target = nil
-        speech = Speech(title: "💡 아이디어!", text: idea.topic + " · " + idea.title)
+        speech = Speech(title: tr("💡 아이디어!", "💡 Idea!"), text: idea.topic + " · " + idea.title)
         begin(.idea, for: 45...45)
         attentionIn = 6
         look = 0
@@ -689,7 +689,7 @@ final class Clawd {
     /// 정각이 되면 "땡!" 하고 좋아한다
     func chime(in world: Playground) {
         happyFor = 1.5
-        world.emit(.text("땡!", .systemYellow, 10), x: x + facing * (world.spriteWidth / 2 + 8),
+        world.emit(.text(tr("땡!", "Ding!"), .systemYellow, 10), x: x + facing * (world.spriteWidth / 2 + 8),
                    y: world.spriteHeight - 10, vy: 4, life: 1.6)
         heart(in: world)
     }
@@ -798,7 +798,7 @@ final class Clawd {
         let glyph = Self.spinner[Int(clock / 0.12) % Self.spinner.count]
         if grumbleFor > 0, let grumble { return Thought(glyph: glyph, text: grumble, grumpy: true) }
         let minutes = workStart.map { Int(Date().timeIntervalSince($0) / 60) } ?? 0
-        return Thought(glyph: glyph, text: label + (minutes >= 1 ? " · \(minutes)분" : ""), grumpy: mood.rawValue >= Mood.annoyed.rawValue)
+        return Thought(glyph: glyph, text: label + (minutes >= 1 ? tr(" · \(minutes)분", " · \(minutes)m") : ""), grumpy: mood.rawValue >= Mood.annoyed.rawValue)
     }
 
     /// 확인 요청이나 완료 알림 말풍선, 그리고 말풍선이 떠 있던 시간

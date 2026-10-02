@@ -13,9 +13,10 @@ struct PetRecord: Codable {
     var patsToday = 0
     var patsDay = ""
 
-    static let levels: [(need: Int, title: String)] = [
-        (0, "낯가림"), (30, "아는 사이"), (100, "친구"), (300, "단짝"), (800, "가족"), (2000, "영혼의 단짝"),
-    ]
+    static let levels: [(need: Int, title: String)] = tr(
+        [(0, "낯가림"), (30, "아는 사이"), (100, "친구"), (300, "단짝"), (800, "가족"), (2000, "영혼의 단짝")],
+        [(0, "Shy"), (30, "Acquaintance"), (100, "Friend"), (300, "Best friend"), (800, "Family"), (2000, "Soulmate")]
+    )
     var level: Int { Self.levels.lastIndex { affection >= $0.need } ?? 0 }
     var levelTitle: String { Self.levels[level].title }
     var nextNeed: Int? { level + 1 < Self.levels.count ? Self.levels[level + 1].need : nil }
@@ -25,14 +26,15 @@ struct PetRecord: Codable {
         return "\(hearts) \(levelTitle) · " + (nextNeed.map { "\(affection)/\($0)" } ?? "\(affection)")
     }
 
-    static let names = ["뭉치", "콩이", "호두", "두부", "감자", "모찌", "구름", "보리", "자두", "땅콩"]
+    static let names = tr(["뭉치", "콩이", "호두", "두부", "감자", "모찌", "구름", "보리", "자두", "땅콩"],
+                           ["Mochi", "Bean", "Walnut", "Tofu", "Potato", "Nugget", "Cloud", "Barley", "Plum", "Peanut"])
 
     var together: String {
         let total = Int(seconds)
         let days = total / 86400, hours = total % 86400 / 3600, minutes = total % 3600 / 60
-        if days > 0 { return "\(days)일 \(hours)시간" }
-        if hours > 0 { return "\(hours)시간 \(minutes)분" }
-        return "\(minutes)분"
+        if days > 0 { return tr("\(days)일 \(hours)시간", "\(days)d \(hours)h") }
+        if hours > 0 { return tr("\(hours)시간 \(minutes)분", "\(hours)h \(minutes)m") }
+        return tr("\(minutes)분", "\(minutes)m")
     }
 }
 
@@ -166,17 +168,17 @@ final class PetWindow: NSObject {
         let menu = NSMenu()
         menu.autoenablesItems = false
         let r = record
-        for line in ["\(r.name) · 함께한 지 \(r.together)", r.affectionLine, "간식 \(r.treats)개 · 쓰다듬기 \(r.pats)번 · 완료 확인 \(r.dones)번"] {
+        for line in [tr("\(r.name) · 함께한 지 \(r.together)", "\(r.name) · together for \(r.together)"), r.affectionLine, tr("간식 \(r.treats)개 · 쓰다듬기 \(r.pats)번 · 완료 확인 \(r.dones)번", "\(r.treats) treats · \(r.pats) pats · \(r.dones) done checks")] {
             menu.addItem(withTitle: line, action: nil, keyEquivalent: "").isEnabled = false
         }
-        menu.addItem(withTitle: "이름 바꾸기…", action: #selector(rename), keyEquivalent: "").target = self
+        menu.addItem(withTitle: tr("이름 바꾸기…", "Rename…"), action: #selector(rename), keyEquivalent: "").target = self
         menu.addItem(.separator())
-        for (title, action) in [("간식 주기 ✻", #selector(giveTreat)), ("쓰다듬기 ♥", #selector(patPet))] {
+        for (title, action) in [(tr("간식 주기 ✻", "Give a treat ✻"), #selector(giveTreat)), (tr("쓰다듬기 ♥", "Pat ♥"), #selector(patPet))] {
             menu.addItem(withTitle: title, action: action, keyEquivalent: "").target = self
         }
         menu.addItem(.separator())
-        menu.addItem(withTitle: "Clawd 한 마리 더", action: #selector(addPet), keyEquivalent: "").target = self
-        let bye = menu.addItem(withTitle: "이 Clawd 보내기", action: #selector(removePet), keyEquivalent: "")
+        menu.addItem(withTitle: tr("Clawd 한 마리 더", "Add a Clawd"), action: #selector(addPet), keyEquivalent: "").target = self
+        let bye = menu.addItem(withTitle: tr("이 Clawd 보내기", "Send this Clawd home"), action: #selector(removePet), keyEquivalent: "")
         bye.target = self
         bye.isEnabled = onRemovePet != nil
         NSMenu.popUpContextMenu(menu, with: event, for: view)
@@ -224,7 +226,7 @@ final class PetWindow: NSObject {
         let r = record
         pet.affectionLevel = r.level
         if r.level > before {
-            pet.celebrate("♥ \(r.levelTitle)!", "\(r.name)와 \(r.levelTitle)이 됐어요", in: world)
+            pet.celebrate("♥ \(r.levelTitle)!", tr("\(r.name)와 \(r.levelTitle)이 됐어요", "You and \(r.name) are now: \(r.levelTitle)"), in: world)
             PetLedger.shared.save()
         }
         saveIn -= dt
@@ -246,13 +248,13 @@ final class PetWindow: NSObject {
 
     @objc private func rename() {
         let alert = NSAlert()
-        alert.messageText = "이 Clawd의 이름"
-        alert.informativeText = "\(record.born.formatted(date: .abbreviated, time: .omitted))에 태어나 함께한 지 \(record.together)."
+        alert.messageText = tr("이 Clawd의 이름", "Name this Clawd")
+        alert.informativeText = tr("\(record.born.formatted(date: .abbreviated, time: .omitted))에 태어나 함께한 지 \(record.together).", "Born \(record.born.formatted(date: .abbreviated, time: .omitted)) · together for \(record.together).")
         let field = NSTextField(string: record.name)
         field.frame = NSRect(x: 0, y: 0, width: 200, height: 24)
         alert.accessoryView = field
-        alert.addButton(withTitle: "저장")
-        alert.addButton(withTitle: "취소")
+        alert.addButton(withTitle: tr("저장", "Save"))
+        alert.addButton(withTitle: tr("취소", "Cancel"))
         NSApp.activate(ignoringOtherApps: true)
         guard alert.runModal() == .alertFirstButtonReturn else { return }
         let name = field.stringValue.trimmingCharacters(in: .whitespaces)

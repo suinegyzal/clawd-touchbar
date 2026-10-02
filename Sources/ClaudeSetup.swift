@@ -94,12 +94,12 @@ enum ClaudeSetup {
         }
         settings["hooks"] = hooks
 
-        var note = "Claude Code와 연결했어요. 새로 시작하는 Claude Code 세션부터 Clawd가 따라 움직여요."
+        var note = tr("Claude Code와 연결했어요. 새로 시작하는 Claude Code 세션부터 Clawd가 따라 움직여요.", "Connected to Claude Code. Clawd will follow along from your next new Claude Code session.")
         let current = (settings["statusLine"] as? [String: Any])?["command"] as? String ?? ""
         if current.isEmpty || current.hasSuffix("clawd-statusline.sh") {
             settings["statusLine"] = ["type": "command", "command": statusScript]
         } else {
-            note += "\n\n이미 다른 상태줄(statusLine)을 쓰고 있어서 그대로 두었어요. Claude 사용량 표시만 빠져요."
+            note += tr("\n\n이미 다른 상태줄(statusLine)을 쓰고 있어서 그대로 두었어요. Claude 사용량 표시만 빠져요.", "\n\nYou already use your own statusLine, so it was left as is. Only the Claude usage display will be missing.")
         }
         try save(settings)
         return note

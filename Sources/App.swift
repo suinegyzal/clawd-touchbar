@@ -8,6 +8,10 @@ enum Main {
             Snapshot.write(to: args[i + 1])
             return
         }
+        if let i = args.firstIndex(of: "--render-docs"), i + 1 < args.count {
+            DocsArt.write(to: args[i + 1])
+            return
+        }
         let app = NSApplication.shared
         if args.contains("--desktop") { UserDefaults.standard.set(true, forKey: "desktopMode") }
         let delegate = AppDelegate(preview: args.contains("--preview"))
@@ -173,10 +177,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTouchBarDelegate, NS
 
     private func offerConnection() {
         let alert = NSAlert()
-        alert.messageText = "Clawd를 Claude Code와 연결할까요?"
-        alert.informativeText = "Claude Code 설정(~/.claude/settings.json)에 훅을 추가해서, Claude가 일하면 Clawd도 따라 움직이게 해요. 쓰던 다른 설정은 건드리지 않고, 바꾸기 전 원본은 settings.json.bak-clawd 로 남겨요. 메뉴 막대의 Clawd 메뉴에서 언제든 끊을 수 있어요."
-        alert.addButton(withTitle: "연결")
-        alert.addButton(withTitle: "나중에")
+        alert.messageText = tr("Clawd를 Claude Code와 연결할까요?", "Connect Clawd to Claude Code?")
+        alert.informativeText = tr("Claude Code 설정(~/.claude/settings.json)에 훅을 추가해서, Claude가 일하면 Clawd도 따라 움직이게 해요. 쓰던 다른 설정은 건드리지 않고, 바꾸기 전 원본은 settings.json.bak-clawd 로 남겨요. 메뉴 막대의 Clawd 메뉴에서 언제든 끊을 수 있어요.", "This adds hooks to your Claude Code settings (~/.claude/settings.json) so Clawd moves along when Claude works. Your other settings stay untouched, and the original is backed up as settings.json.bak-clawd. You can disconnect anytime from the Clawd menu in the menu bar.")
+        alert.addButton(withTitle: tr("연결", "Connect"))
+        alert.addButton(withTitle: tr("나중에", "Later"))
         NSApp.activate(ignoringOtherApps: true)
         if alert.runModal() == .alertFirstButtonReturn {
             connectClaude()
@@ -188,13 +192,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTouchBarDelegate, NS
     private func connectClaude() {
         let alert = NSAlert()
         do {
-            alert.messageText = "연결 완료"
+            alert.messageText = tr("연결 완료", "Connected")
             alert.informativeText = try ClaudeSetup.connect()
             defaults.removeObject(forKey: Key.declined)
         } catch {
             alert.alertStyle = .warning
-            alert.messageText = "연결하지 못했어요"
-            alert.informativeText = "\(error.localizedDescription)\n\n~/.claude/settings.json 이 올바른 JSON인지 확인해 주세요."
+            alert.messageText = tr("연결하지 못했어요", "Couldn't connect")
+            alert.informativeText = "\(error.localizedDescription)\n\n" + tr("~/.claude/settings.json 이 올바른 JSON인지 확인해 주세요.", "Please check that ~/.claude/settings.json is valid JSON.")
         }
         NSApp.activate(ignoringOtherApps: true)
         alert.runModal()
@@ -414,7 +418,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTouchBarDelegate, NS
     private func showPreviewWindow() {
         let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: barWidth, height: 30),
                               styleMask: [.titled, .closable], backing: .buffered, defer: false)
-        window.title = "Clawd Pet 미리보기"
+        window.title = tr("Clawd Pet 미리보기", "Clawd Pet Preview")
         window.isReleasedWhenClosed = false
         window.contentView = playground
         window.center()
@@ -451,28 +455,28 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTouchBarDelegate, NS
             choice.target = self
             return choice
         }
-        let sourceItem = menu.addItem(withTitle: "달리기 기준", action: nil, keyEquivalent: "")
+        let sourceItem = menu.addItem(withTitle: tr("달리기 기준", "Run speed follows"), action: nil, keyEquivalent: "")
         sourceItem.submenu = sourceMenu
         menu.addItem(.separator())
-        showItem = menu.addItem(withTitle: "Touch Bar에 보이기", action: #selector(toggleTouchBar), keyEquivalent: "")
-        desktopItem = menu.addItem(withTitle: "화면 위에 띄우기 (Touch Bar 없이)", action: #selector(toggleDesktop), keyEquivalent: "")
+        showItem = menu.addItem(withTitle: tr("Touch Bar에 보이기", "Show on Touch Bar"), action: #selector(toggleTouchBar), keyEquivalent: "")
+        desktopItem = menu.addItem(withTitle: tr("화면 위에 띄우기 (Touch Bar 없이)", "Float on screen (no Touch Bar)"), action: #selector(toggleDesktop), keyEquivalent: "")
         menu.addItem(.separator())
-        menu.addItem(withTitle: "완료 알림 모두 확인", action: #selector(acknowledgeAll), keyEquivalent: "")
-        menu.addItem(withTitle: "💡 아이디어", action: nil, keyEquivalent: "").submenu = ideasMenu
-        menu.addItem(withTitle: "간식 떨어뜨리기 ✻", action: #selector(dropTreat), keyEquivalent: "")
-        addItem = menu.addItem(withTitle: "Clawd 한 마리 더", action: #selector(addPet), keyEquivalent: "")
-        removeItem = menu.addItem(withTitle: "Clawd 한 마리 보내기", action: #selector(removePet), keyEquivalent: "")
+        menu.addItem(withTitle: tr("완료 알림 모두 확인", "Mark all done notices read"), action: #selector(acknowledgeAll), keyEquivalent: "")
+        menu.addItem(withTitle: tr("💡 아이디어", "💡 Ideas"), action: nil, keyEquivalent: "").submenu = ideasMenu
+        menu.addItem(withTitle: tr("간식 떨어뜨리기 ✻", "Drop a treat ✻"), action: #selector(dropTreat), keyEquivalent: "")
+        addItem = menu.addItem(withTitle: tr("Clawd 한 마리 더", "Add a Clawd"), action: #selector(addPet), keyEquivalent: "")
+        removeItem = menu.addItem(withTitle: tr("Clawd 한 마리 보내기", "Send a Clawd home"), action: #selector(removePet), keyEquivalent: "")
         menu.addItem(.separator())
-        bigItem = menu.addItem(withTitle: "크게 보기", action: #selector(toggleBig), keyEquivalent: "")
-        wideItem = menu.addItem(withTitle: "넓게 쓰기 (Control Strip 가리기)", action: #selector(toggleWide), keyEquivalent: "")
-        controlsItem = menu.addItem(withTitle: "밝기·소리 버튼", action: #selector(toggleControls), keyEquivalent: "")
-        metricsItem = menu.addItem(withTitle: "Touch Bar에 Mac 상태 보기", action: #selector(toggleMetrics), keyEquivalent: "")
-        menuBarPetItem = menu.addItem(withTitle: "메뉴 막대에서 돌아다니기", action: #selector(toggleMenuBarPet), keyEquivalent: "")
+        bigItem = menu.addItem(withTitle: tr("크게 보기", "Bigger Clawds"), action: #selector(toggleBig), keyEquivalent: "")
+        wideItem = menu.addItem(withTitle: tr("넓게 쓰기 (Control Strip 가리기)", "Full width (cover Control Strip)"), action: #selector(toggleWide), keyEquivalent: "")
+        controlsItem = menu.addItem(withTitle: tr("밝기·소리 버튼", "Brightness & volume buttons"), action: #selector(toggleControls), keyEquivalent: "")
+        metricsItem = menu.addItem(withTitle: tr("Touch Bar에 Mac 상태 보기", "Mac stats on Touch Bar"), action: #selector(toggleMetrics), keyEquivalent: "")
+        menuBarPetItem = menu.addItem(withTitle: tr("메뉴 막대에서 돌아다니기", "Roam the menu bar"), action: #selector(toggleMenuBarPet), keyEquivalent: "")
         menu.addItem(.separator())
-        connectItem = menu.addItem(withTitle: "Claude Code 연결", action: #selector(toggleConnect), keyEquivalent: "")
-        loginItem = menu.addItem(withTitle: "로그인할 때 자동 실행", action: #selector(toggleLogin), keyEquivalent: "")
+        connectItem = menu.addItem(withTitle: tr("Claude Code 연결", "Connect Claude Code"), action: #selector(toggleConnect), keyEquivalent: "")
+        loginItem = menu.addItem(withTitle: tr("로그인할 때 자동 실행", "Open at login"), action: #selector(toggleLogin), keyEquivalent: "")
         menu.addItem(.separator())
-        menu.addItem(withTitle: "종료", action: #selector(quit), keyEquivalent: "q")
+        menu.addItem(withTitle: tr("종료", "Quit"), action: #selector(quit), keyEquivalent: "q")
         for menuItem in menu.items where menuItem.action != nil { menuItem.target = self }
 
         item.menu = menu
@@ -487,15 +491,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTouchBarDelegate, NS
         func percent(_ value: Double) -> Int { Int((value * 100).rounded()) }
         var lines = [
             "CPU \(percent(stats.cpu))% · GPU \(percent(stats.gpu))%",
-            String(format: "메모리 %.1fGB 사용 (%d%%)", stats.memoryUsedGB, percent(stats.memory)),
-            String(format: "저장 공간 %.0fGB 남음 (%d%% 사용)", stats.diskFreeGB, percent(stats.disk)),
-            stats.battery.map { "배터리 \(percent($0.level))%" + ($0.charging ? " (충전 중)" : "") } ?? "전원 어댑터 사용 중",
-            "네트워크 ↓\(MetricsRenderer.rate(stats.download))/s ↑\(MetricsRenderer.rate(stats.upload))/s",
+            String(format: tr("메모리 %.1fGB 사용 (%d%%)", "Memory %.1f GB used (%d%%)"), stats.memoryUsedGB, percent(stats.memory)),
+            String(format: tr("저장 공간 %.0fGB 남음 (%d%% 사용)", "Storage %.0f GB free (%d%% used)"), stats.diskFreeGB, percent(stats.disk)),
+            stats.battery.map { tr("배터리", "Battery") + " \(percent($0.level))%" + ($0.charging ? tr(" (충전 중)", " (charging)") : "") } ?? tr("전원 어댑터 사용 중", "On power adapter"),
+            tr("네트워크", "Network") + " ↓\(MetricsRenderer.rate(stats.download))/s ↑\(MetricsRenderer.rate(stats.upload))/s",
         ]
         if let usage = stats.claude {
-            let parts = [usage.fiveHour.map { "5시간 \(percent($0.used))%" }, usage.sevenDay.map { "7일 \(percent($0.used))%" },
-                         usage.context.map { "컨텍스트 \(percent($0))%" }].compactMap { $0 }
-            lines.append("Claude 사용량 " + (parts.isEmpty ? (usage.model ?? "") : parts.joined(separator: " · ")))
+            let parts = [usage.fiveHour.map { tr("5시간", "5h") + " \(percent($0.used))%" }, usage.sevenDay.map { tr("7일", "7d") + " \(percent($0.used))%" },
+                         usage.context.map { tr("컨텍스트", "Context") + " \(percent($0))%" }].compactMap { $0 }
+            lines.append(tr("Claude 사용량 ", "Claude usage ") + (parts.isEmpty ? (usage.model ?? "") : parts.joined(separator: " · ")))
         }
         for (i, line) in statsLines.enumerated() {
             line.title = i < lines.count ? lines[i] : ""
@@ -514,14 +518,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTouchBarDelegate, NS
         bigItem.state = big ? .on : .off
         wideItem.state = useWide ? .on : .off
         wideItem.isEnabled = !previewMode && !controlStripOnly
-        wideItem.toolTip = controlStripOnly ? "Touch Bar가 확장된 Control Strip 모드라서 항상 넓게 표시돼요" : nil
+        wideItem.toolTip = controlStripOnly ? tr("Touch Bar가 확장된 Control Strip 모드라서 항상 넓게 표시돼요", "Your Touch Bar uses the Expanded Control Strip, so Clawd always uses the full width") : nil
         controlsItem.state = showControls ? .on : .off
         controlsItem.isEnabled = useWide && !previewMode
         metricsItem.state = showMetrics ? .on : .off
         menuBarPetItem.state = menuBarPet?.isShowing == true ? .on : .off
         menuBarPetItem.isEnabled = menuBarPet != nil
         metricsItem.isEnabled = !previewMode
-        connectItem.title = ClaudeSetup.isConnected ? "Claude Code 연결 끊기" : "Claude Code 연결"
+        connectItem.title = ClaudeSetup.isConnected ? tr("Claude Code 연결 끊기", "Disconnect Claude Code") : tr("Claude Code 연결", "Connect Claude Code")
         loginItem.state = ClaudeSetup.launchesAtLogin ? .on : .off
         loginItem.isEnabled = ClaudeSetup.canAutoLaunch
     }
@@ -533,7 +537,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTouchBarDelegate, NS
         guard let box = world.ideas else { return }
         box.reload()
         if box.ideas.isEmpty {
-            ideasMenu.addItem(withTitle: "아직 아이디어가 없어요 (리서치 루틴이 3시간마다 채워요)", action: nil, keyEquivalent: "").isEnabled = false
+            ideasMenu.addItem(withTitle: tr("아직 아이디어가 없어요 (리서치 루틴이 3시간마다 채워요)", "No ideas yet (an idea routine fills this up)"), action: nil, keyEquivalent: "").isEnabled = false
         }
         for idea in box.ideas.prefix(12) {
             let item = ideasMenu.addItem(withTitle: (box.isSeen(idea) ? "" : "● ") + idea.topic + " · " + idea.title,
@@ -543,10 +547,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTouchBarDelegate, NS
             item.target = self
         }
         ideasMenu.addItem(.separator())
-        let pitch = ideasMenu.addItem(withTitle: "지금 하나 던져 줘", action: #selector(pitchIdea), keyEquivalent: "")
+        let pitch = ideasMenu.addItem(withTitle: tr("지금 하나 던져 줘", "Pitch one now"), action: #selector(pitchIdea), keyEquivalent: "")
         pitch.target = self
         pitch.isEnabled = !box.unseen.isEmpty
-        ideasMenu.addItem(withTitle: "리서치 보고서 폴더 열기", action: #selector(openReports), keyEquivalent: "").target = self
+        ideasMenu.addItem(withTitle: tr("리서치 보고서 폴더 열기", "Open research reports folder"), action: #selector(openReports), keyEquivalent: "").target = self
     }
 
     @objc private func openIdea(_ sender: NSMenuItem) {

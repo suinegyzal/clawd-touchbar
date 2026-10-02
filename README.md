@@ -1,5 +1,7 @@
 # Clawd Pet
 
+[English](README.en.md) · **한국어**
+
 이것저것 만들어보는 공간입니다. 디놈들이 심심해서 만든 토큰 낭비 시리즈-
 
 ![화면 위를 떠다니는 Clawd 여섯 마리. 일하는 녀석, 시계 든 녀석, 완료 말풍선](docs/preview.gif)

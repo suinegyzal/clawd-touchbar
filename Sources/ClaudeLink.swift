@@ -102,14 +102,14 @@ final class ClaudeLink {
 
     var summaryLine: String {
         guard let first = active.first else {
-            return lastEventAt == nil ? "Claude 연동: 아직 신호 없음" : "Claude: 쉬는 중"
+            return lastEventAt == nil ? tr("Claude 연동: 아직 신호 없음", "Claude: no signal yet") : tr("Claude: 쉬는 중", "Claude: resting")
         }
         switch first.status {
-        case .working: return "Claude: 일하는 중" + (active.count > 1 ? " (\(active.count)개 세션)" : "")
-        case .waiting: return "Claude: 확인을 기다리는 중"
+        case .working: return tr("Claude: 일하는 중", "Claude: working") + (active.count > 1 ? tr(" (\(active.count)개 세션)", " (\(active.count) sessions)") : "")
+        case .waiting: return tr("Claude: 확인을 기다리는 중", "Claude: waiting for your OK")
         case .done:
             let count = active.filter { if case .done = $0.status { return true } else { return false } }.count
-            return "Claude: 확인 안 한 완료 알림 \(count)개"
+            return tr("Claude: 확인 안 한 완료 알림 \(count)개", "Claude: \(count) unread done notice(s)")
         }
     }
 
@@ -254,8 +254,8 @@ final class ClaudeLink {
             } else if now.timeIntervalSince(pending.at) > 2.5 {
                 let since = session.promptAt ?? .distantPast
                 let summary = Transcript.lastAnswer(entries, since: since).flatMap { Self.brief($0) }
-                    ?? Self.brief(session.prompt, limit: 40).map { "‘\($0)’ 끝!" }
-                    ?? "다 했어요"
+                    ?? Self.brief(session.prompt, limit: 40).map { tr("‘\($0)’ 끝!", "‘\($0)’ done!") }
+                    ?? tr("다 했어요", "All done")
                 finish(&session, summary, at: now)
             }
             sessions[id] = session
@@ -318,9 +318,9 @@ final class ClaudeLink {
     static func permissionText(_ message: String) -> String {
         if let range = message.range(of: "to use ") {
             let tool = message[range.upperBound...].trimmingCharacters(in: .whitespacesAndNewlines.union(.punctuationCharacters))
-            if !tool.isEmpty { return "\(tool) 써도 될까요?" }
+            if !tool.isEmpty { return tr("\(tool) 써도 될까요?", "Can I use \(tool)?") }
         }
-        return "확인이 필요해요"
+        return tr("확인이 필요해요", "Needs your OK")
     }
 
     static func brief(_ text: String, limit: Int = 64) -> String? {

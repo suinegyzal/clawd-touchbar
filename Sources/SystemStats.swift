@@ -9,7 +9,7 @@ enum RunnerSource: String, CaseIterable {
     var title: String {
         switch self {
         case .cpu: return "CPU"
-        case .memory: return "메모리"
+        case .memory: return tr("메모리", "Memory")
         case .gpu: return "GPU"
         }
     }
