@@ -9,7 +9,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 PUBLIC_REPO="https://github.com/suinegyzal/clawd-pet.git"
-DIR="$HOME/Documents/clawd-pet-public"
+DIR="$(cd .. && pwd)/clawd-pet-public"   # 이 저장소 옆 폴더
 MESSAGE="${1:-Update}"
 
 [ -d "$DIR/.git" ] || git clone -q "$PUBLIC_REPO" "$DIR"
