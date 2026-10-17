@@ -54,6 +54,10 @@ enum ClawdSprite {
         var prop = Prop.none
         /// 선글라스 짙기 (0 = 안 씀, 1 = 새까맣게). 화면이 밝을수록 짙어진다
         var shades: CGFloat = 0
+        /// 보는 방향 (-1 왼쪽, 1 오른쪽). 좌우가 다른 캐릭터(양 등)만 쓴다
+        var facing: CGFloat = -1
+        /// 고개를 숙인 칸 수 (양이 풀을 뜯을 때)
+        var headDown = 0
     }
 
     private static let body = cells([
@@ -161,6 +165,9 @@ enum ClawdSprite {
         ["pppp..pppp", "ppllpppllp", "pllpppplpp", "cccccccccc"],
     ]
     private static let laptop = ["ssssssssssss", "sssssoosssss", "sssssoosssss", "dddddddddddd"]
+    /// 다른 캐릭터도 같은 책·노트북을 쓴다
+    static func bookArt(_ page: Int) -> [String] { books[page % 2] }
+    static var laptopArt: [String] { laptop }
 
     private static func drawProp(_ prop: Prop, rect: (Int, Int) -> CGRect, in ctx: CGContext) {
         func paint(_ art: [String], col: Int, row: Int) {
@@ -246,6 +253,64 @@ enum PixelArt {
         ".###.",
         "..#..",
     ])
+
+    /// 양의 간식 풀떼기 (위에서부터 g 진한 풀, l 연한 풀, w 꽃잎, y 꽃술)
+    private static let grass = [
+        "......w..",
+        ".....wyw.",
+        ".l....g..",
+        ".g..l.g.l",
+        "..g.lg.g.",
+        "l.gglggl.",
+        ".lggggggl",
+    ]
+    private static let grassColors: [Character: CGColor] = [
+        "g": CGColor(srgbRed: 0.24, green: 0.6, blue: 0.27, alpha: 1),
+        "l": CGColor(srgbRed: 0.5, green: 0.8, blue: 0.33, alpha: 1),
+        "w": CGColor(gray: 1, alpha: 1),
+        "y": Palette.treat,
+    ]
+
+    /// 연어의 물고기밥 한 알
+    static func drawFlake(in ctx: CGContext, centerX: CGFloat, bottom: CGFloat, px: CGFloat, scale: CGFloat = 2) {
+        let x0 = ClawdSprite.snap(centerX - px, scale), y0 = ClawdSprite.snap(bottom, scale)
+        ctx.setFillColor(CGColor(srgbRed: 0.72, green: 0.42, blue: 0.2, alpha: 1))
+        ctx.fill([CGRect(x: x0, y: y0, width: 2 * px, height: px)])
+        ctx.setFillColor(CGColor(srgbRed: 0.96, green: 0.72, blue: 0.4, alpha: 1))
+        ctx.fill([CGRect(x: x0, y: y0 + px, width: px, height: px)])
+    }
+
+    /// 스완의 빵 부스러기 한 조각. 쪼아 먹을수록 작아진다
+    static func drawCrumb(left: CGFloat, in ctx: CGContext, centerX: CGFloat, bottom: CGFloat, px: CGFloat, scale: CGFloat = 2) {
+        let crumb = CGColor(srgbRed: 0.96, green: 0.83, blue: 0.56, alpha: 1)
+        let crust = CGColor(srgbRed: 0.78, green: 0.5, blue: 0.26, alpha: 1)
+        let x0 = ClawdSprite.snap(centerX - 1.5 * px, scale), y0 = ClawdSprite.snap(bottom, scale)
+        func rect(_ c: Int, _ r: Int) -> CGRect { CGRect(x: x0 + CGFloat(c) * px, y: y0 + CGFloat(r) * px, width: px, height: px) }
+        // 아래가 0행
+        let whole: [(CGColor, [(Int, Int)])] = [(crumb, [(0, 0), (1, 0), (1, 1)]), (crust, [(2, 0), (0, 1)])]
+        let half: [(CGColor, [(Int, Int)])] = [(crumb, [(1, 0)]), (crust, [(2, 0)])]
+        guard left > 0 else { return }
+        for (color, cells) in left > 0.5 ? whole : half {
+            ctx.setFillColor(color)
+            ctx.fill(cells.map { rect($0.0, $0.1) })
+        }
+    }
+
+    /// 풀은 아래에서부터 자라고, 뜯어 먹으면 위에서부터 줄어든다
+    static func drawGrass(grown: CGFloat, in ctx: CGContext, centerX: CGFloat, bottom: CGFloat, px: CGFloat, scale: CGFloat = 2) {
+        let rows = grass.count, cols = grass[0].count
+        let visible = Int((CGFloat(rows) * min(max(grown, 0), 1)).rounded(.up))
+        guard visible > 0 else { return }
+        let left = ClawdSprite.snap(centerX - CGFloat(cols) * px / 2, scale)
+        let base = ClawdSprite.snap(bottom, scale)
+        for (r, line) in grass.enumerated().suffix(visible) {
+            for (c, ch) in line.enumerated() {
+                guard let color = grassColors[ch] else { continue }
+                ctx.setFillColor(color)
+                ctx.fill(CGRect(x: left + CGFloat(c) * px, y: base + CGFloat(rows - 1 - r) * px, width: px, height: px))
+            }
+        }
+    }
 
     static func draw(_ cells: [(Int, Int)], size: (Int, Int), in ctx: CGContext, centerX: CGFloat, centerY: CGFloat,
                      px: CGFloat, color: CGColor, scale: CGFloat = 2) {

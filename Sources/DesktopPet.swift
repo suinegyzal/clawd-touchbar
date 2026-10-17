@@ -173,12 +173,13 @@ final class PetWindow: NSObject {
         }
         menu.addItem(withTitle: tr("이름 바꾸기…", "Rename…"), action: #selector(rename), keyEquivalent: "").target = self
         menu.addItem(.separator())
-        for (title, action) in [(tr("간식 주기 ✻", "Give a treat ✻"), #selector(giveTreat)), (tr("쓰다듬기 ♥", "Pat ♥"), #selector(patPet))] {
+        for (title, action) in [(world.species.giveTreatTitle, #selector(giveTreat)), (tr("쓰다듬기 ♥", "Pat ♥"), #selector(patPet))] {
             menu.addItem(withTitle: title, action: action, keyEquivalent: "").target = self
         }
         menu.addItem(.separator())
-        menu.addItem(withTitle: tr("Clawd 한 마리 더", "Add a Clawd"), action: #selector(addPet), keyEquivalent: "").target = self
-        let bye = menu.addItem(withTitle: tr("이 Clawd 보내기", "Send this Clawd home"), action: #selector(removePet), keyEquivalent: "")
+        let name = world.species.title
+        menu.addItem(withTitle: tr("\(name) 한 마리 더", "Add a \(name)"), action: #selector(addPet), keyEquivalent: "").target = self
+        let bye = menu.addItem(withTitle: tr("이 \(name) 보내기", "Send this \(name) home"), action: #selector(removePet), keyEquivalent: "")
         bye.target = self
         bye.isEnabled = onRemovePet != nil
         NSMenu.popUpContextMenu(menu, with: event, for: view)

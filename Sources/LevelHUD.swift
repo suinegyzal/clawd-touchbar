@@ -21,6 +21,12 @@ final class LevelHUD {
         }
     }
 
+    /// 어떤 동물이 바를 들지
+    var species: Species {
+        get { world.species }
+        set { world.species = newValue }
+    }
+
     func show(_ kind: Playground.Gauge.Kind, level: Float) {
         guard let screen = NSScreen.main ?? NSScreen.screens.first else { return }
         if window == nil { makeWindow() }

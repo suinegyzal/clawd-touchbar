@@ -33,20 +33,24 @@ final class RunnerClock {
     /// 달리기 한 바퀴: 한 발 → 공중 → 다른 발 → 공중. lift는 몸이 뜨는 픽셀 수.
     static func pose(_ frame: Int) -> (frame: ClawdSprite.Frame, lift: CGFloat) {
         switch frame % frameCount {
-        case 0: return (ClawdSprite.Frame(legs: .stepA, look: 1), 0)
-        case 2: return (ClawdSprite.Frame(legs: .stepB, look: 1), 0)
-        default: return (ClawdSprite.Frame(legs: .tucked, look: 1), 1)
+        case 0: return (ClawdSprite.Frame(legs: .stepA, look: 1, facing: 1), 0)
+        case 2: return (ClawdSprite.Frame(legs: .stepB, look: 1, facing: 1), 0)
+        default: return (ClawdSprite.Frame(legs: .tucked, look: 1, facing: 1), 1)
         }
     }
 
     /// 메뉴 막대용 달리기 그림들
-    static func menuBarImages(px: CGFloat) -> [NSImage] {
-        (0..<frameCount).map { index in
+    static func menuBarImages(px: CGFloat, species: Species = .current) -> [NSImage] {
+        let cell = species.cellPx(px)
+        return (0..<frameCount).map { index in
             let pose = pose(index)
-            let size = NSSize(width: CGFloat(ClawdSprite.cols) * px, height: CGFloat(ClawdSprite.rows + 1) * px)
+            // 메뉴 막대는 밝을 수 있어서 흰 동물엔 테두리
+            let outline = species != .clawd
+            let pad = outline ? cell : 0
+            let size = NSSize(width: species.width(px) + pad * 2, height: species.height(px) + cell + pad * 2)
             return NSImage(size: size, flipped: false) { _ in
                 guard let ctx = NSGraphicsContext.current?.cgContext else { return false }
-                ClawdSprite.draw(pose.frame, in: ctx, centerX: size.width / 2, bottom: pose.lift * px, px: px)
+                species.draw(pose.frame, in: ctx, centerX: size.width / 2, bottom: pad + pose.lift * cell, px: px, outline: outline)
                 return true
             }
         }

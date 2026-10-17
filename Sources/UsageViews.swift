@@ -160,8 +160,64 @@ final class UsagePanel: NSView {
         content.claude = tabs.selectedSegment == 1
     }
 
-    /// 메뉴가 열려 있는 동안 1초마다
+    /// 보이는 동안 1초마다
     func refresh() { content.needsDisplay = true }
+}
+
+/// 메뉴의 "사용량·Mac 상태 보기…": 탭 판을 작은 창으로 띄운다. 열려 있는 동안 1초마다 새로 그린다.
+final class UsageWindow: NSObject, NSWindowDelegate {
+    private let stats: SystemStats
+    private let onCalibrate: () -> Void
+    private var window: NSWindow?
+    private var panel: UsagePanel?
+
+    init(stats: SystemStats, onCalibrate: @escaping () -> Void) {
+        self.stats = stats
+        self.onCalibrate = onCalibrate
+    }
+
+    func show() {
+        if window == nil { build() }
+        stats.tokens.refresh { [weak self] in self?.panel?.refresh() }   // 새로 쌓인 기록까지
+        panel?.refresh()
+        NSApp.activate(ignoringOtherApps: true)
+        window?.makeKeyAndOrderFront(nil)
+    }
+
+    func refresh() {
+        guard window?.isVisible == true else { return }
+        panel?.refresh()
+    }
+
+    /// 언어가 바뀌었을 때: 열려 있으면 그 자리에 새 말로 다시 연다
+    func rebuild() {
+        guard let old = window else { return }
+        let reopen = old.isVisible, topLeft = NSPoint(x: old.frame.minX, y: old.frame.maxY)
+        old.delegate = nil
+        old.orderOut(nil)
+        window = nil
+        guard reopen else { return }
+        build()
+        window?.setFrameTopLeftPoint(topLeft)
+        show()
+    }
+
+    private func build() {
+        let panel = UsagePanel(stats: stats, onCalibrate: onCalibrate)
+        let size = NSSize(width: panel.frame.width, height: panel.frame.height + 10)
+        let window = KeyWindow(contentRect: NSRect(origin: .zero, size: size), styleMask: [.titled, .closable],
+                               backing: .buffered, defer: false)
+        window.title = tr("사용량", "Usage")
+        window.isReleasedWhenClosed = false
+        window.delegate = self
+        let content = NSView(frame: NSRect(origin: .zero, size: size))
+        panel.frame.origin = NSPoint(x: 0, y: 4)
+        content.addSubview(panel)
+        window.contentView = content
+        window.center()
+        self.window = window
+        self.panel = panel
+    }
 }
 
 /// 탭 안쪽. 위에서부터 그린다.

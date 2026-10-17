@@ -94,12 +94,13 @@ enum MetricsRenderer {
     /// 제자리에서 달리는 작은 Clawd. 빠를 땐 뒤로 속도선이 흐른다.
     private static func drawRunner(frame: Int, busy: Double, in ctx: CGContext) {
         let px: CGFloat = 1
+        let species = Species.current
         let pose = RunnerClock.pose(frame)
         let centerX = runnerWidth / 2 + 4
-        ClawdSprite.draw(pose.frame, in: ctx, centerX: centerX, bottom: 9 + pose.lift * px, px: px)
+        species.draw(pose.frame, in: ctx, centerX: centerX, bottom: 9 + pose.lift * species.cellPx(px), px: px)
         guard busy > 0.4 else { return }
         ctx.setFillColor(CGColor(gray: 0.5, alpha: 1))
-        let left = centerX - CGFloat(ClawdSprite.cols) * px / 2
+        let left = centerX - species.width(px) / 2
         for (i, y) in [13.0, 16.0, 19.0].enumerated() where busy > 0.4 + Double(i) * 0.2 {
             let shift = CGFloat((frame + i) % 2) * 1.5
             ctx.fill(CGRect(x: left - 5 - shift, y: CGFloat(y), width: 3.5, height: 1))

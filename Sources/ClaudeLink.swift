@@ -108,9 +108,13 @@ final class ClaudeLink {
         case .working: return tr("Claude: 일하는 중", "Claude: working") + (active.count > 1 ? tr(" (\(active.count)개 세션)", " (\(active.count) sessions)") : "")
         case .waiting: return tr("Claude: 확인을 기다리는 중", "Claude: waiting for your OK")
         case .done:
-            let count = active.filter { if case .done = $0.status { return true } else { return false } }.count
-            return tr("Claude: 확인 안 한 완료 알림 \(count)개", "Claude: \(count) unread done notice(s)")
+            return tr("Claude: 확인 안 한 완료 알림 \(unreadDones)개", "Claude: \(unreadDones) unread done notice(s)")
         }
+    }
+
+    /// 아직 확인하지 않은 완료 알림 수
+    var unreadDones: Int {
+        sessions.values.filter { if case .done = $0.status { return true } else { return false } }.count
     }
 
     private static func priority(_ status: Status) -> Int {

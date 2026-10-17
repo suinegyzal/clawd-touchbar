@@ -5,7 +5,7 @@ import AppKit
 final class Clawd {
     enum Activity {
         // 자유 시간
-        case idle, rest, walk, run, hop, sleep, chase, cheer, clock, idea
+        case idle, rest, walk, run, hop, sleep, chase, graze, cheer, clock, idea
         // 손에 들렸을 때
         case held, fall
         // Claude가 일할 때
@@ -102,7 +102,23 @@ final class Clawd {
     private var label: String?
     private var speech: Speech?
 
-    var isAirborne: Bool { y > 0 || vy != 0 }
+    /// 물고기는 물 밖으로 솟구친 동안만 공중이다
+    var isAirborne: Bool { swims ? leaping : y > 0 || vy != 0 }
+    /// 헤엄치는 캐릭터(물고기): 중력 대신 물에 떠서 깊이를 바꾸며 다닌다
+    var swims = false
+    /// 물 밖으로 뛰어오른 중 (중력을 받는다)
+    private(set) var leaping = false
+    /// 가고 싶은 깊이 (바닥에서부터)
+    private var depthGoal: CGFloat = 0
+    private var depthIn = 0.0
+    /// 헤엄치는 녀석이 지금 물 밖에 있는지 (드나들 때 첨벙)
+    var aboveWater = false
+    /// 물고기가 입을 벌려 덥석 무는 중
+    private var gulpFor = 0.0
+    /// 일하며 강을 거슬러 오르다 상류 끝에 닿으면, 물살을 타고 맨 뒤까지 한 번 쭉 내려간다
+    private var ridingDown = false
+    /// 다음 도약까지
+    private var leapIn = 0.0
     var hasJob: Bool { job != nil }
     /// 마지막으로 맡았던 Claude 세션의 주제 (그 주제 아이디어는 이 Clawd가 던진다)
     private(set) var lastTopic: String?
@@ -122,6 +138,8 @@ final class Clawd {
         activityClock += dt
         timeLeft -= dt
         happyFor = max(0, happyFor - dt)
+        gulpFor = max(0, gulpFor - dt)
+        if !activity.isWorking { ridingDown = false }
         grumbleFor = max(0, grumbleFor - dt)
         tickBlink(dt)
         yawnFor = max(0, yawnFor - dt)
@@ -131,14 +149,17 @@ final class Clawd {
             if dizzyStarIn <= 0 {
                 dizzyStarIn = 0.35
                 let side: CGFloat = Bool.random() ? 1 : -1
-                world.emit(.text("✦", NSColor(cgColor: Palette.treat)!, 8), x: x + side * world.px * 5, y: world.spriteHeight + world.px,
+                world.emit(.text("✦", NSColor(cgColor: Palette.treat)!, 8), x: x + side * world.spriteWidth * 0.28, y: world.spriteHeight + world.px,
                            vx: -side * 14, vy: 10, life: 0.9)
             }
         }
 
         if activity == .held { return }
 
-        if isAirborne {
+        if swims {
+            swim(dt, world)
+            if activity.isWorking { swimUpstream(dt, world) }
+        } else if isAirborne {
             vy -= world.gravity * CGFloat(dt)
             y += vy * CGFloat(dt)
             if y <= 0 { land(in: world) }
@@ -168,7 +189,7 @@ final class Clawd {
                 sweatIn -= dt
                 if sweatIn <= 0 {
                     sweatIn = .random(in: 0.4...0.8)
-                    world.emit(.sweat, x: x - facing * world.px * 8, y: world.spriteHeight - world.px * 2,
+                    world.emit(.sweat, x: x - facing * world.spriteWidth * 0.44, y: world.spriteHeight - world.px * 2,
                                vx: -facing * 12, vy: 12, life: 0.5)
                 }
             }
@@ -185,7 +206,7 @@ final class Clawd {
             if zIn <= 0 {
                 zIn = 0.9
                 world.emit(.text("z", Palette.text, CGFloat.random(in: 7...9)),
-                           x: x + facing * world.px * 6, y: world.px * 7,
+                           x: x + facing * world.spriteWidth * 0.33, y: world.sittingHeight * 0.88,
                            vx: facing * 5, vy: 6, life: 1.6)
             }
             if timeLeft <= 0 {
@@ -194,12 +215,15 @@ final class Clawd {
             }
         case .chase:
             chase(dt, world)
+        case .graze:
+            graze(dt, world)
         case .exercise:
+            if swims { break }   // 연어는 땀 대신 물살을 가른다 (swimUpstream)
             sweatIn -= dt
             if sweatIn <= 0 {
                 sweatIn = .random(in: 0.6...1.2)
                 let side: CGFloat = Bool.random() ? 1 : -1
-                world.emit(.sweat, x: x + side * world.px * 7, y: world.spriteHeight - world.px * 2,
+                world.emit(.sweat, x: x + side * world.spriteWidth * 0.39, y: world.spriteHeight - world.px * 2,
                            vx: side * 10, vy: 14, life: 0.6)
             }
         case .announce:
@@ -264,14 +288,14 @@ final class Clawd {
     private func tickMood(_ dt: Double, _ world: Playground) {
         moodIn -= dt
         guard moodIn <= 0 else { return }
-        let top = frame.sitting ? world.px * 8 : world.spriteHeight
+        let top = frame.sitting ? world.sittingHeight : world.spriteHeight
         switch mood {
         case .calm:
             moodIn = 2
         case .tired:
             moodIn = .random(in: 3...5)
             let side: CGFloat = Bool.random() ? 1 : -1
-            world.emit(.sweat, x: x + side * world.px * 7, y: top - world.px * 2, vx: side * 10, vy: 14, life: 0.6)
+            world.emit(.sweat, x: x + side * world.spriteWidth * 0.39, y: top - world.px * 2, vx: side * 10, vy: 14, life: 0.6)
             if Double.random(in: 0..<1) < 0.3 { say(tr(["휴…", "하아…", "좀 걸리네…"], ["Phew…", "Sigh…", "Taking a while…"])) }
         case .annoyed:
             moodIn = .random(in: 1.2...2)
@@ -288,7 +312,7 @@ final class Clawd {
 
     private func steam(_ world: Playground, top: CGFloat) {
         for side in [-1.0, 1.0] as [CGFloat] {
-            world.emit(.steam, x: x + side * world.px * 3, y: top, vx: side * 5, vy: 12, life: 0.8)
+            world.emit(.steam, x: x + side * world.spriteWidth * 0.17, y: top, vx: side * 5, vy: 12, life: 0.8)
         }
     }
 
@@ -328,7 +352,7 @@ final class Clawd {
             applyJob(world)
             return
         }
-        if world.nearestTreat(to: x) != nil {
+        if world.nearestTreat(to: x, for: self) != nil {
             startChase(world)
             return
         }
@@ -388,7 +412,7 @@ final class Clawd {
 
     private func yawn(_ world: Playground) {
         yawnFor = 1.3
-        world.emit(.text(tr("하암…", "Yawn…"), Palette.text, 8), x: x + facing * world.px * 7, y: world.spriteHeight - world.px * 3,
+        world.emit(.text(tr("하암…", "Yawn…"), Palette.text, 8), x: x + facing * world.spriteWidth * 0.39, y: world.spriteHeight - world.px * 3,
                    vx: facing * 4, vy: 7, life: 1.4)
     }
 
@@ -400,7 +424,9 @@ final class Clawd {
     }
 
     private func stroll(speed: CGFloat, _ dt: Double, _ world: Playground) {
-        x += facing * speed * CGFloat(dt)
+        // 물고기는 꼬리를 힘껏 쳤다가 미끄러지듯 나아간다
+        let stroke = swims ? 0.5 + 0.8 * max(0, sin(activityClock * 4.2)) : 1
+        x += facing * speed * CGFloat(stroke * dt)
         if x <= world.minX { x = world.minX; facing = 1 }
         if x >= world.maxX { x = world.maxX; facing = -1 }
         look = Int(facing)
@@ -412,15 +438,20 @@ final class Clawd {
         vy = 0
         if activity == .fall {
             world.puffDust(at: x)
-            if job != nil {
-                applyJob(world)
-            } else if dizzyFor > 0 {
-                begin(.idle, for: dizzyFor...dizzyFor)
-                look = 0
-            } else {
-                begin(.idle, for: 0.5...0.9)
-                look = 0
-            }
+            finishFall(world)
+        }
+    }
+
+    /// 떨어지기가 끝났다 (땅에 닿거나 물에 들어가서): 하던 일로
+    private func finishFall(_ world: Playground) {
+        if job != nil {
+            applyJob(world)
+        } else if dizzyFor > 0 {
+            begin(.idle, for: dizzyFor...dizzyFor)
+            look = 0
+        } else {
+            begin(.idle, for: 0.5...0.9)
+            look = 0
         }
     }
 
@@ -519,62 +550,263 @@ final class Clawd {
     // MARK: - 간식
 
     func noticeTreat(in world: Playground) {
-        if job != nil { return }   // 일하는 중에는 한눈팔지 않는다
+        // 일하는 중에는 한눈팔지 않는다. 단 물고기는 밥이면 일하다가도 미친 듯이 달려든다
+        let frenzy = swims && world.treats.contains { $0.kind == .flake && !$0.eaten }
+        if job != nil && !frenzy { return }
         switch activity {
-        case .held, .fall, .chase:
+        case .held, .fall, .chase, .graze:
             return
         case .sleep:
             exclaim("!", in: world)
         default:
-            break
+            if frenzy { exclaim("!", in: world) }
         }
         startChase(world)
     }
 
     private func startChase(_ world: Playground) {
-        target = world.nearestTreat(to: x)
+        target = world.nearestTreat(to: x, for: self)
         if target != nil { activity = .chase }
     }
 
+    // MARK: - 헤엄 (물고기)
+
+    /// 물속 가장 높이 올라갈 수 있는 깊이: 등지느러미가 수면을 살짝 가를 만큼
+    private func swimCeiling(_ world: Playground) -> CGFloat {
+        max(0, world.level(at: x) - world.spriteHeight * 0.7)
+    }
+    /// 수면의 밥을 먹을 땐 입이 물 밖에 닿도록 더 올라온다
+    private func feedCeiling(_ world: Playground) -> CGFloat {
+        max(0, world.level(at: x) - world.spriteHeight * 0.4)
+    }
+
+    /// 물속에선 중력 대신 원하는 깊이로 부드럽게 오르내리고, 점프는 물 밖으로 솟구치는 도약이 된다
+    private func swim(_ dt: Double, _ world: Playground) {
+        let t = CGFloat(dt)
+        let level = world.level(at: x), body = world.spriteHeight
+        let ceiling = swimCeiling(world)
+        // 뭍 동물의 점프 신호(위로 속도)를 받으면 지금 깊이에서 수면 위로 솟구친다. 세게 뛸수록 높이
+        if !leaping && vy > 60 {
+            let fraction = min(1.2, vy * vy / (2 * world.gravity) / max(2, world.headroom - 1))
+            let peak = min(level - body * (0.5 - 0.6 * fraction), world.height - body * 0.85)
+            vy = sqrt(2 * world.gravity * max(2, peak - y))
+            leaping = true
+        }
+        // 물 밖에 있으면(들었다 놓았을 때) 떨어진다
+        if !leaping && y + body / 2 > level { leaping = true }
+        if leaping {
+            vy -= world.gravity * t
+            y += vy * t
+            // 다시 물에 들어가면 물이 받쳐 준다
+            if (vy < 0 && y + body / 2 < level) || y <= 0 {
+                leaping = false
+                y = max(0, y)
+                vy *= 0.3
+                depthGoal = min(y, ceiling)
+                if activity == .fall { finishFall(world) }
+            }
+            return
+        }
+        if activity == .fall { finishFall(world) }   // 물속에서 놓아 주면 바로 헤엄
+        pickDepth(dt, world, ceiling: ceiling)
+        // 밥 먹으러 갈 땐 더 빠르게 오르내린다
+        let snap: CGFloat = activity == .chase ? 9 : 4
+        vy += ((depthGoal - y) * snap - vy * 3) * t
+        y += vy * t
+        let top = activity == .chase ? feedCeiling(world) : ceiling
+        if y < 0 || y > top {
+            y = min(max(y, 0), top)
+            vy = 0
+        }
+    }
+
+    /// 하는 일에 맞는 깊이: 자면 바닥, 팻말·부르기는 수면 가까이, 일할 땐 가운데, 놀 땐 이리저리
+    private func pickDepth(_ dt: Double, _ world: Playground, ceiling: CGFloat) {
+        let holdsSign = showsClock || world.gauge?.holder == ObjectIdentifier(self)
+        switch activity {
+        case .sleep:
+            depthGoal = 0
+        case .chase, .graze:
+            break   // 간식 높이를 따라간다
+        case .hop, .call, .announce, .idea:
+            depthGoal = ceiling
+        case .think, .study, .craft, .exercise:
+            depthGoal = ceiling * 0.45
+        default:
+            depthIn -= dt
+            if depthIn <= 0 {
+                depthIn = .random(in: 1.5...4)
+                depthGoal = ceiling * .random(in: 0.05...1)
+            }
+        }
+        if holdsSign {
+            // 팻말은 배 밑에 매달고, 팻말이 바닥에 닿지 않을 만큼 떠오른다
+            let sign = Species.signHeight(px: world.px)
+            depthGoal = min(ceiling, sign - world.species.signSink(px: world.px) + 1)
+        }
+        depthGoal = min(max(depthGoal, 0), ceiling)
+    }
+
+    /// 연어가 일하는 모습: 상류(왼쪽) 오르막을 향해 꼬리를 세차게 치며 자주 뛰어올라 거슬러 오른다.
+    /// 뛰어오를 때마다 앞으로 나아가고, 그 사이엔 거센 물살에 조금씩 밀린다.
+    /// 상류 끝에 닿으면 돌아서 물살을 타고 맨 뒤(하류 끝)까지 한 번 쭉 내려갔다가 다시 오른다
+    private func swimUpstream(_ dt: Double, _ world: Playground) {
+        let t = CGFloat(dt)
+        if ridingDown {
+            facing = 1
+            look = 1
+            x += 95 * t
+            if x >= world.maxX - 1 {
+                x = world.maxX
+                ridingDown = false
+                leapIn = 0.6
+            }
+            return
+        }
+        facing = -1
+        look = -1
+        // 지칠수록 힘이 빠지고, 화나면 더 세게
+        let power: CGFloat = mood == .tired ? 0.75 : mood == .furious ? 1.35 : 1
+        let stroke = max(0, CGFloat(sin(activityClock * 3.4)))
+        x += facing * 16 * power * stroke * t
+        if leaping { x += facing * 70 * power * t }
+        x += 3 * world.current * t   // 물살에 조금씩 밀린다
+        x = min(max(x, world.minX), world.maxX)
+        if x <= world.minX + 1, !leaping {
+            ridingDown = true   // 다 올라왔다! 이제 물살 타고 쭉
+            happyFor = 1.2
+            return
+        }
+        // 자주 뛰어오른다 (운동할 땐 더 자주)
+        leapIn -= dt
+        if leapIn <= 0, !leaping {
+            leapIn = activity == .exercise ? .random(in: 0.9...1.5) : .random(in: 1.4...2.4)
+            vy = world.jumpVelocity(.random(in: 0.55...0.8) * power)
+        }
+        // 머리 앞에서 물이 갈라져 몸 옆으로 흘러간다
+        sweatIn -= dt
+        if sweatIn <= 0, !leaping {
+            sweatIn = .random(in: 0.08...0.18)
+            let head = x + facing * world.spriteWidth * 0.48
+            world.emit(.sweat, x: head, y: y + world.spriteHeight * CGFloat.random(in: 0.2...0.8),
+                       vx: CGFloat.random(in: 45...70), vy: CGFloat.random(in: -4...4), life: 0.45)
+        }
+    }
+
+    /// 물고기의 간식 쫓기: 가라앉는 간식을 그 높이까지 따라가 입으로 받아 먹는다
+    private func swimChase(_ treat: Treat, _ dt: Double, _ world: Playground) {
+        let reach = world.species.mouthOffset(px: world.px)
+        if abs(treat.x - x) > 0.5 { facing = treat.x > x ? 1 : -1 }
+        look = Int(facing)
+        let goal = min(max(treat.x - facing * reach, world.minX), world.maxX)
+        let dx = goal - x
+        let step = min(abs(dx), (treat.kind == .flake ? 140 : 80) * CGFloat(dt))   // 밥이면 미친 듯이
+        x += dx > 0 ? step : -step
+        moving = step > 0.01
+        let mouth = world.spriteHeight * 0.42
+        depthGoal = min(max(treat.y - mouth, 0), feedCeiling(world))
+        // 물속에 들어온 간식만 (수면 위로 떨어지는 동안은 아래에서 기다린다). 바닥에 가라앉은 건 바닥까지 내려가 줍는다
+        let level = abs(treat.y - (y + mouth)) < world.spriteHeight * 0.35 || (y <= 1 && treat.y <= y + mouth)
+        if abs(dx) < 2, treat.y < world.level(at: treat.x) + 2, level {
+            eat(treat, world)
+        }
+    }
+
     private func chase(_ dt: Double, _ world: Playground) {
-        guard let treat = target, !treat.eaten else {
-            if let next = world.nearestTreat(to: x) {
+        guard let treat = target, !treat.eaten, treat.isFree(for: self) else {
+            if let next = world.nearestTreat(to: x, for: self) {
                 target = next
             } else {
-                // 다른 Clawd가 먼저 먹어버렸다
+                // 다른 녀석이 먼저 먹어버렸다
                 exclaim("?", in: world)
-                begin(.idle, for: 0.8...1.5)
-                look = 0
                 moving = false
+                if job != nil {
+                    applyJob(world)   // 밥 먹으러 왔던 물고기는 하던 일로
+                } else {
+                    begin(.idle, for: 0.8...1.5)
+                    look = 0
+                }
             }
             return
         }
 
-        let goal = min(max(treat.x, world.minX), world.maxX)
+        if swims {
+            swimChase(treat, dt, world)
+            return
+        }
+        // 풀·빵은 입(머리 쪽)이 닿는 자리까지, 반짝이는 몸 한가운데로
+        let byMouth = treat.eatenByMouth
+        let reach = byMouth ? world.species.mouthOffset(px: world.px) : 0
+        if byMouth && abs(treat.x - x) > 0.5 { facing = treat.x > x ? 1 : -1 }
+        let goal = min(max(treat.x - facing * reach, world.minX), world.maxX)
         let dx = goal - x
-        if abs(dx) > 0.5 { facing = dx > 0 ? 1 : -1 }
+        if !byMouth && abs(dx) > 0.5 { facing = dx > 0 ? 1 : -1 }
         look = Int(facing)
 
         let step = min(abs(dx), 65 * CGFloat(dt))
         x += dx > 0 ? step : -step
         moving = step > 0.01
 
-        let closeEnough = abs(treat.x - x) <= world.spriteWidth / 2 + 2 && abs(dx) < 1
-        if closeEnough && treat.y <= y + world.spriteHeight + 2 {
+        let closeEnough = abs(treat.x - (x + facing * reach)) <= world.spriteWidth / 2 + 2 && abs(dx) < 1
+        if closeEnough && byMouth {
+            moving = false
+            // 풀은 다 자라고, 빵은 땅에 떨어진 뒤에
+            if (treat.grown >= 1 && treat.y <= 0.5) || treat.bitten {
+                treat.bitten = true
+                treat.grazer = self
+                begin(.graze, for: 30...30)   // 다 뜯어 먹을 때까지
+            } else {
+                look = 0   // 풀이 다 자라거나 빵이 떨어질 때까지 기다린다
+            }
+        } else if closeEnough && treat.y <= y + world.spriteHeight + 2 {
             eat(treat, world)
         } else if closeEnough {
             look = 0   // 떨어지는 간식을 올려다보며 기다린다
         }
     }
 
+    /// 고개를 숙이고 먹는다: 풀은 위에서부터 2초 동안 뜯고, 빵 부스러기는 콕콕 쪼아 금방
+    private func graze(_ dt: Double, _ world: Playground) {
+        guard let food = target, !food.eaten else {
+            // 다른 녀석이 먼저 다 먹었다
+            target = nil
+            exclaim("?", in: world)
+            begin(.idle, for: 0.8...1.5)
+            return
+        }
+        food.grown -= CGFloat(dt / (food.kind == .grass ? 2.0 : 0.5))
+        if food.grown <= 0 { eat(food, world) }
+    }
+
     private func eat(_ treat: Treat, _ world: Playground) {
         world.eat(treat)
         treatsEaten += 1
+        if swims { gulpFor = 0.3 }
         target = nil
         moving = false
         happyFor = 1.4
-        if !isAirborne { vy = world.jumpVelocity(0.8) }
-        begin(.cheer, for: 1.0...1.3)
+        if treat.kind == .flake, let level = world.waterLevel {
+            world.splash(at: treat.x, level: level, size: 2)   // 수면에서 덥석
+        }
+        if treat.kind == .crumb || treat.kind == .flake, world.nearestTreat(to: x, for: self) != nil {
+            // 부스러기·물고기밥이 더 남았으면 하트 없이 바로 다음 조각으로
+            happyFor = 0.4
+            startChase(world)
+            return
+        }
+        if job != nil {
+            heart(in: world)
+            applyJob(world)   // 다 먹었으면 하던 일로
+            return
+        }
+        if treat.eatenByMouth {
+            // 다 먹고 나면 고개를 들고 흐뭇하게
+            begin(.idle, for: 1.0...1.6)
+            look = 0
+        } else {
+            if !isAirborne { vy = world.jumpVelocity(0.8) }
+            begin(.cheer, for: 1.0...1.3)
+        }
         heart(in: world)
     }
 
@@ -589,8 +821,8 @@ final class Clawd {
             if !isAirborne { vy = world.jumpVelocity(0.6) }
             begin(.idle, for: 1...1.8)
             look = 0
-        case .think, .study, .craft, .exercise, .clock:
-            // 일하거나 시계를 들고 있으면 좋아하기만 하고 하던 일은 계속
+        case .think, .study, .craft, .exercise, .clock, .graze:
+            // 일하거나 시계를 들고 있거나 풀을 뜯는 중이면 좋아하기만 하고 하던 일은 계속
             happyFor = 1
             heart(in: world)
         case .idea:
@@ -680,7 +912,8 @@ final class Clawd {
         activity = .held
         target = nil
         vy = 0
-        y = world.headroom * 0.6
+        y = world.headroom * (swims ? 1 : 0.6)   // 물고기는 물 밖으로 건져 올린다
+        leaping = false
         look = 0
     }
 
@@ -715,14 +948,15 @@ final class Clawd {
     }
 
     private func exclaim(_ mark: String, in world: Playground) {
-        let top = activity == .sleep || activity == .rest ? world.px * 8 : world.spriteHeight
+        let top = activity == .sleep || activity == .rest ? world.sittingHeight : world.spriteHeight
         world.emit(.text(mark, mark == "!" ? .systemYellow : Palette.text, 10),
                    x: x + facing * (world.spriteWidth / 2 + 2), y: top - 6, vy: 5, life: 0.9)
     }
 
     private func heart(in world: Playground) {
-        world.emit(.heart, x: x + facing * (world.spriteWidth / 2 + 4), y: world.spriteHeight - 4,
-                   vx: facing * 4, vy: 9, life: 1.1)
+        // 물고기는 입 앞에서 (헤엄치는 깊이까지 따라)
+        let y = swims ? self.y + world.spriteHeight * 0.7 : world.spriteHeight - 4
+        world.emit(.heart, x: x + facing * (world.spriteWidth / 2 + 4), y: y, vx: facing * 4, vy: 9, life: 1.1)
     }
 
     // MARK: - 그리기용 상태
@@ -730,6 +964,7 @@ final class Clawd {
     var frame: ClawdSprite.Frame {
         var f = ClawdSprite.Frame()
         f.look = look
+        f.facing = facing
         switch activity {
         case .idle, .hop:
             break
@@ -744,7 +979,11 @@ final class Clawd {
             f.legs = step(legPeriod)
         case .chase:
             f.legs = moving ? step(0.08) : .stand
-            if !moving { f.eyes = .up }
+            if !moving { f.eyes = target?.kind == .grass ? .open : .up }
+        case .graze:
+            // 우물우물: 고개를 까딱이며 씹는다
+            f.headDown = Int(clock / 0.22) % 2 == 0 ? 6 : 5
+            f.eyes = .closed
         case .sleep:
             f.sitting = true
             f.eyes = .closed
@@ -774,6 +1013,16 @@ final class Clawd {
             f.armsUp = Int(clock / 0.4) % 2 == 0
             f.eyes = .up
         }
+        if swims && activity.isWorking {
+            // 연어는 일할 때 소품 대신 강을 거슬러 오른다: 꼬리를 세차게 (물살 타고 내려갈 땐 느긋하게)
+            f.prop = .none
+            f.sitting = false
+            f.armsUp = false
+            f.legs = step(ridingDown ? 0.35 : mood == .tired ? 0.12 : 0.07)
+        } else if swims && !isAirborne && f.legs == .stand && activity != .sleep {
+            f.legs = step(0.45)   // 물고기는 가만히 있어도 꼬리를 살랑살랑
+        }
+        if swims && gulpFor > 0 { f.headDown = 1 }   // 덥석 (입을 벌린다)
         if isAirborne && activity != .held {
             f.armsUp = true
             if !f.sitting { f.legs = activity == .fall ? .stand : .tucked }

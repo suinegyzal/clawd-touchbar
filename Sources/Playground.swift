@@ -7,6 +7,34 @@ final class Treat {
     var age: Double = 0
     var eaten = false
 
+    enum Kind {
+        /// 하늘에서 떨어지는 반짝이 (Clawd). 닿으면 펄쩍 뛰며 먹는다
+        case spark
+        /// 땅에서 자라나는 풀떼기 (양). 고개를 숙이고 뜯어 먹는다
+        case grass
+        /// 흩뿌려지는 빵 부스러기 (스완). 하나씩 콕콕 쪼아 먹는다
+        case crumb
+        /// 물 위에 둥둥 뜨는 물고기밥 (연어). 일하던 녀석까지 미친 듯이 달려든다
+        case flake
+    }
+    /// 물고기밥이 물 위에 떠 있다 (물결 따라 오르내리고 하류로 천천히 흘러간다)
+    var afloat = false
+    var kind = Kind.spark
+    /// 입으로 먹는 간식 (머리가 닿는 자리까지 가서 고개를 숙인다)
+    var eatenByMouth: Bool { kind != .spark }
+    /// 남은 양 (풀은 0에서 자라 1이 되고, 먹으면 줄어든다)
+    var grown: CGFloat = 1
+    /// 누가 먹기 시작했다 (그 뒤로는 풀이 더 자라지 않는다)
+    var bitten = false
+    /// 지금 먹고 있는 녀석. 한 조각은 한 마리만 (둘이 머리를 맞대면 얼굴이 겹친다)
+    weak var grazer: Clawd?
+
+    /// 이 녀석이 먹으러 가도 되는지: 다른 양이 뜯는 중이 아니면 (들려 가는 등 자리를 뜨면 다시 비었다)
+    func isFree(for pet: Clawd?) -> Bool {
+        guard let grazer, grazer !== pet else { return true }
+        return grazer.activity != .graze
+    }
+
     init(x: CGFloat, y: CGFloat) {
         self.x = x
         self.y = y
@@ -83,8 +111,14 @@ final class Playground {
     private(set) var treats: [Treat] = []
     var particles: [Particle] = []
 
-    var spriteWidth: CGFloat { CGFloat(ClawdSprite.cols) * px }
-    var spriteHeight: CGFloat { CGFloat(ClawdSprite.rows) * px }
+    /// 어떤 동물로 그릴지 (행동은 모두 같다)
+    var species = Species.clawd {
+        didSet { for pet in pets { pet.swims = species.swims } }
+    }
+    var spriteWidth: CGFloat { species.width(px) }
+    var spriteHeight: CGFloat { species.height(px) }
+    /// 앉았을 때 머리 꼭대기
+    var sittingHeight: CGFloat { species.sittingHeight(px) }
     var headroom: CGFloat { height - spriteHeight }
     var minX: CGFloat { spriteWidth / 2 + 1 }
     var maxX: CGFloat { max(minX, width - spriteWidth / 2 - 1) }
@@ -92,6 +126,51 @@ final class Playground {
     /// 머리가 천장에 닿기 직전까지 뛰는 초속
     func jumpVelocity(_ fraction: CGFloat = 1) -> CGFloat {
         sqrt(2 * gravity * max(2, (headroom - 1) * fraction))
+    }
+
+    // MARK: - 물 (헤엄치는 캐릭터)
+
+    /// 헤엄치는 높이의 한계 (물 표면). 아래 70%가 물이다
+    var swimLevel: CGFloat { (height * 0.7).rounded() }
+    /// 그려지는 물 높이. 헤엄치는 캐릭터일 때만, 투명한 화면 위·메뉴 막대는 물 없이 (헤엄은 똑같이 친다)
+    var waterLevel: CGFloat? { species.swims && !transparent ? swimLevel : nil }
+    /// 물결 시계와 출렁임 세기 (첨벙할 때마다 커졌다가 잦아든다)
+    private(set) var clock = 0.0
+    private(set) var slosh: CGFloat = 0
+    /// 강물 흐름 세기 (0.25 잔잔 ~ 1 세참). 누가 일하며 물살을 거슬러 오를 때 세진다
+    private(set) var current: CGFloat = 0.25
+    /// 물살 줄무늬가 하류로 흘러간 거리
+    private(set) var flow: CGFloat = 0
+
+    /// 물살이 세지면 강이 상류(왼쪽)로 갈수록 높아지는 오르막이 된다 (한쪽 끝에서 가운데까지 높이 차)
+    var tilt: CGFloat { species.swims ? max(0, current - 0.25) / 0.75 * height * 0.16 : 0 }
+
+    /// 이 x에서 물 높이 (물결 없이). 오르막이면 왼쪽이 높다. 밝기·소리 키 쪽(오른쪽 밖)까지 이어진다
+    func level(at x: CGFloat) -> CGFloat {
+        let along = min(max(x / max(width, 1), 0), 1.4)
+        return swimLevel + tilt * (1 - 2 * along)
+    }
+
+    /// 이 x에서 물 표면 높이 (오르막 + 두 물결을 겹쳐 출렁인다)
+    func waterSurface(at x: CGFloat) -> CGFloat? {
+        guard waterLevel != nil else { return nil }
+        let amp = px * (0.7 + slosh)
+        let t = CGFloat(clock)
+        return level(at: x) + amp * sin(x / 16 + t * 1.7) + amp * 0.5 * sin(x / 7 - t * 2.6)
+    }
+
+    /// 물속에서 아주 살짝 둥실둥실 (깊이는 물고기가 직접 바꾼다)
+    func swimLift(_ pet: Clawd, sitting: Bool) -> CGFloat {
+        guard species.swims, !pet.isAirborne else { return 0 }
+        return CGFloat(sin(pet.time * 1.8 + Double(pet.x) / 40)) * species.cellPx(px) * (sitting ? 0.25 : 0.5)
+    }
+
+    /// 물을 가르며 첨벙: 물방울이 튀고 물결이 크게 출렁인다
+    func splash(at x: CGFloat, level: CGFloat, size: Int) {
+        for _ in 0..<size {
+            emit(.sweat, x: x + CGFloat.random(in: -6...6), y: level, vx: CGFloat.random(in: -35...35), vy: CGFloat.random(in: 25...60), life: 0.55)
+        }
+        slosh = min(2.5, slosh + CGFloat(size) * 0.2)
     }
 
     // MARK: - 구성
@@ -103,6 +182,7 @@ final class Playground {
 
     func addPet(at x: CGFloat? = nil) {
         let pet = Clawd(x: x ?? CGFloat.random(in: minX...maxX))
+        pet.swims = species.swims
         pet.y = height
         pet.activity = .fall
         pets.append(pet)
@@ -110,9 +190,38 @@ final class Playground {
 
     @discardableResult
     func dropTreat(at x: CGFloat? = nil) -> Treat {
-        if treats.count >= 8 { treats.removeFirst() }
         let tx = min(max(x ?? CGFloat.random(in: minX...maxX), 5), width - 5)
-        let treat = Treat(x: tx, y: height - 4)
+        let treat: Treat
+        switch species.treat {
+        case .grass:
+            // 풀떼기가 땅에서 쑥쑥
+            treat = Treat(x: tx, y: 0)
+            treat.kind = .grass
+            treat.grown = 0
+            emit(.dust, x: tx - 3, y: 1, vx: -10, vy: 6, life: 0.3)
+            emit(.dust, x: tx + 3, y: 1, vx: 10, vy: 6, life: 0.3)
+        case .crumb:
+            // 빵 부스러기 세 조각을 흩뿌린다 (조금씩 다른 높이에서 떨어진다)
+            treat = Treat(x: tx, y: height - 2)
+            treat.kind = .crumb
+            for (dx, dy) in [(-7, 5), (6, 10)] as [(CGFloat, CGFloat)] {
+                let crumb = Treat(x: min(max(tx + dx, 5), width - 5), y: height + dy)
+                crumb.kind = .crumb
+                treats.append(crumb)
+            }
+        case .flake:
+            // 물고기밥 다섯 알을 흩뿌린다
+            treat = Treat(x: tx, y: height)
+            treat.kind = .flake
+            for (dx, dy) in [(-14, 6), (-6, 3), (7, 9), (15, 4)] as [(CGFloat, CGFloat)] {
+                let flake = Treat(x: min(max(tx + dx, 5), width - 5), y: height + dy)
+                flake.kind = .flake
+                treats.append(flake)
+            }
+        case .spark:
+            treat = Treat(x: tx, y: height - 4)
+        }
+        while treats.count >= 12 { treats.removeFirst() }
         treats.append(treat)
         for pet in pets { pet.noticeTreat(in: self) }
         return treat
@@ -196,8 +305,12 @@ final class Playground {
         pollIn = 0
     }
 
-    func nearestTreat(to x: CGFloat) -> Treat? {
-        treats.filter { !$0.eaten }.min { abs($0.x - x) < abs($1.x - x) }
+    /// 풀이 다 자라는 데 걸리는 초
+    static let grassGrowth = 0.9
+
+    /// for: 그 녀석이 먹을 수 있는 것만 (다른 양이 뜯고 있는 풀은 빼고)
+    func nearestTreat(to x: CGFloat, for pet: Clawd? = nil) -> Treat? {
+        treats.filter { !$0.eaten && $0.isFree(for: pet) }.min { abs($0.x - x) < abs($1.x - x) }
     }
 
     func eat(_ treat: Treat) {
@@ -234,12 +347,53 @@ final class Playground {
 
     func update(_ dt: Double) {
         let t = CGFloat(dt)
+        clock += dt
+        slosh = max(0, slosh - t * 1.2)
+        if species.swims {
+            let rushing = pets.contains { $0.activity.isWorking }
+            current += ((rushing ? 1 : 0.25) - current) * min(1, t * 0.8)
+            flow += current * t * 70
+        }
+        let level = waterLevel
 
         for treat in treats {
             treat.age += dt
+            if treat.kind == .grass {
+                if !treat.bitten { treat.grown = min(1, treat.grown + CGFloat(dt / Self.grassGrowth)) }
+                continue
+            }
+            if treat.kind == .flake {
+                // 물고기밥: 떨어지다 수면에 닿으면 둥둥 뜬다
+                let surface = waterSurface(at: treat.x) ?? self.level(at: treat.x)
+                if treat.afloat {
+                    treat.y = surface
+                    treat.x = min(treat.x + current * 5 * t, width - 4)   // 물살 따라 하류로
+                } else {
+                    treat.vy -= gravity * 0.4 * t
+                    treat.y += treat.vy * t
+                    if treat.y <= surface {
+                        treat.y = surface
+                        treat.vy = 0
+                        treat.afloat = true
+                        if level != nil { splash(at: treat.x, level: surface, size: 1) }
+                    }
+                }
+                continue
+            }
             guard treat.y > 0 || treat.vy != 0 else { continue }
-            treat.vy -= gravity * 0.55 * t
+            let here = level.map { _ in self.level(at: treat.x) }
+            let wasAbove = here.map { treat.y > $0 } ?? true
+            if let level = here, treat.y < level {
+                // 물속에선 천천히 가라앉는다
+                treat.vy = max(-35, treat.vy - gravity * 0.08 * t)
+            } else {
+                treat.vy -= gravity * 0.55 * t
+            }
             treat.y += treat.vy * t
+            if let level = here, wasAbove, treat.y <= level {
+                splash(at: treat.x, level: level, size: 3)
+                treat.vy *= 0.25
+            }
             if treat.y <= 0 {
                 treat.y = 0
                 treat.vy = abs(treat.vy) > 40 ? -treat.vy * 0.4 : 0
@@ -267,6 +421,24 @@ final class Playground {
         }
 
         for pet in pets { pet.update(dt, in: self) }
+
+        if level != nil {
+            for pet in pets {
+                // 몸 가운데가 물 표면을 지나면 첨벙
+                let level = self.level(at: pet.x)
+                let above = pet.y + swimLift(pet, sitting: false) + spriteHeight / 2 > level
+                if above != pet.aboveWater {
+                    pet.aboveWater = above
+                    splash(at: pet.x, level: level, size: above ? 5 : 7)
+                }
+                // 물속에서 가끔 보글보글
+                if !above, Double.random(in: 0...1) < dt / 3 {
+                    let mouth = pet.x + pet.facing * spriteWidth * 0.42
+                    emit(.text("°", NSColor(srgbRed: 0.66, green: 0.85, blue: 0.9, alpha: 1), 9), x: mouth,
+                         y: pet.y + swimLift(pet, sitting: false) + spriteHeight * 0.4, vx: 0, vy: 9, life: 1.4)
+                }
+            }
+        }
 
         gauge?.age += dt
         if let g = gauge, g.age > Self.gaugeLife { gauge = nil }

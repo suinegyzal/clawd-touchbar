@@ -20,6 +20,10 @@ enum Main {
             DocsGif.writeUsage(to: args[i + 1])
             return
         }
+        if let i = args.firstIndex(of: "--render-species"), i + 1 < args.count {
+            SpeciesSheet.write(to: args[i + 1])
+            return
+        }
         if let i = args.firstIndex(of: "--render-reddit"), i + 1 < args.count {
             DocsGif.write(to: args[i + 1], square: true)
             return
@@ -50,8 +54,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTouchBarDelegate, NS
     }
     private static let barID = NSTouchBarItem.Identifier("com.local.ClaudeTouchBar.playground")
     private static let trayID = NSTouchBarItem.Identifier("com.local.ClaudeTouchBar.tray")
-    private static let brightnessID = NSTouchBarItem.Identifier("com.local.ClaudeTouchBar.brightness")
-    private static let volumeID = NSTouchBarItem.Identifier("com.local.ClaudeTouchBar.volume")
+    private static let controlsID = NSTouchBarItem.Identifier("com.local.ClaudeTouchBar.controls")
     private static let metricsID = NSTouchBarItem.Identifier("com.local.ClaudeTouchBar.metrics")
     private static let usageID = NSTouchBarItem.Identifier("com.local.ClaudeTouchBar.usage")
     private static let controlWidth: CGFloat = 46
@@ -68,10 +71,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTouchBarDelegate, NS
     /// 소리·밝기를 바꾸면 화면에 뜨는 Clawd
     private let levelHUD = LevelHUD()
     private let levelWatcher = LevelWatcher()
-    private var levelHUDItem: NSMenuItem!
     /// Claude가 일을 마치면 울릴 macOS 소리 ("" = 끄기)
     private static let doneSounds = ["Glass", "Ping", "Pop", "Purr", "Hero", "Tink", "Submarine"]
-    private var doneSoundItems: [NSMenuItem] = []
     private var lastDoneSound = Date.distantPast
     private let runner = RunnerClock()
     private lazy var runnerImages = RunnerClock.menuBarImages(px: 1.5)
@@ -87,29 +88,40 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTouchBarDelegate, NS
     private var previewWindow: NSWindow?
     /// 화면 위 모드(Touch Bar 없는 맥): 떠다니는 Clawd 창들
     private var petWindows: [PetWindow] = []
-    private var desktopItem: NSMenuItem!
-    private var connectItem: NSMenuItem!
-    private var loginItem: NSMenuItem!
     private var isShowing = false
     private var muteButton: NSButton?
+    /// 밝기·소리 버튼 줄
+    private lazy var controlPad: ControlPad = {
+        let mute = controlButton("speaker.slash.fill", #selector(toggleMute), repeats: false)
+        muteButton = mute
+        syncMuteButton()
+        return ControlPad(buttons: [
+            controlButton("sun.min.fill", #selector(brightnessDown)),
+            controlButton("sun.max.fill", #selector(brightnessUp)),
+            mute,
+            controlButton("speaker.wave.1.fill", #selector(volumeDown)),
+            controlButton("speaker.wave.3.fill", #selector(volumeUp)),
+        ], buttonWidth: Self.controlWidth)
+    }()
+    /// 놀이터 아이템. 버튼이 바로 옆이면 한 아이템에 붙여 강물이 끊기지 않게
+    private lazy var barContainer = BarContainer(playground: playground)
+    /// 버튼을 놀이터 아이템에 붙일지 (사이에 사용량·Mac 상태가 없을 때)
+    private var padJoinsBar: Bool { hasControls && !hasUsage && !hasMetrics }
 
-    private var countItem: NSMenuItem!
-    private var linkItem: NSMenuItem!
+    /// 메뉴 맨 위 한 줄: 몇 마리 · Claude가 뭘 하는지
+    private var statusLineItem: NSMenuItem!
     private var showItem: NSMenuItem!
+    private var treatItem: NSMenuItem!
     private var addItem: NSMenuItem!
     private var removeItem: NSMenuItem!
-    private var bigItem: NSMenuItem!
-    private var wideItem: NSMenuItem!
-    private var controlsItem: NSMenuItem!
-    private var metricsItem: NSMenuItem!
-    private var usageBarItem: NSMenuItem!
-    /// 메뉴 맨 위의 [Mac 상태 | Claude 사용량] 탭
-    private var usagePanel: UsagePanel?
+    private var acknowledgeItem: NSMenuItem!
+    private var usageItem: NSMenuItem!
+    /// [Mac 상태 | Claude 사용량] 탭 판을 띄우는 창
+    private lazy var usageWindow = UsageWindow(stats: stats) { [weak self] in self?.showCalibration() }
     private let ideasMenu = NSMenu()
     private var menuBarPet: MenuBarPet?
-    private var menuBarPetItem: NSMenuItem!
-    private var sourceItems: [NSMenuItem] = []
-    private var languageItems: [NSMenuItem] = []
+    /// 자주 안 바꾸는 것들은 메뉴 대신 설정 창에
+    private lazy var settings = SettingsWindow { [weak self] in self?.settingsPanes() ?? [] }
 
     init(preview: Bool) {
         previewMode = preview
@@ -168,7 +180,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTouchBarDelegate, NS
     /// 옆에 붙는 아이템들 사이에는 8pt씩 간격이 생긴다.
     private var barWidth: CGFloat {
         var width: CGFloat = useWide ? 1004 : 685
-        if hasControls { width -= (Self.controlWidth + 8) * 5 }
+        if hasControls { width -= ControlPad.width(buttonWidth: Self.controlWidth, count: 5) + 8 }
         if hasMetrics { width -= MetricsView.width + 8 }
         if hasUsage { width -= UsageView.width + 8 }
         return width - 6
@@ -184,11 +196,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTouchBarDelegate, NS
         world.width = barWidth
         world.setPetCount(petCount)
         try? FileManager.default.createDirectory(at: ClaudeLink.directory, withIntermediateDirectories: true)
+        world.species = Species.current
+        levelHUD.species = Species.current
         world.link = ClaudeLink(pendingFile: ClaudeLink.pendingFile)
         world.link?.onFinish = { [weak self] in self?.playDoneSound() }
         world.ideas = IdeaBox()
         if !previewMode {
             menuBarPet = MenuBarPet(link: world.link, ideas: world.ideas)
+            menuBarPet?.world.species = Species.current
             menuBarPet?.petCount = petCount
             if defaults.bool(forKey: Key.menuBarPet) { menuBarPet?.show() }
         }
@@ -213,6 +228,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTouchBarDelegate, NS
         }
         if !previewMode && !ClaudeSetup.isConnected && !defaults.bool(forKey: Key.declined) {
             DispatchQueue.main.asyncAfter(deadline: .now() + 1) { [weak self] in self?.offerConnection() }
+        }
+        // 확인·문서 그림용: --show-settings [탭 번호], --show-usage, --show-menu
+        let args = CommandLine.arguments
+        if let i = args.firstIndex(of: "--show-settings") {
+            let tab = args.indices.contains(i + 1) ? Int(args[i + 1]) : nil
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in self?.settings.show(tab: tab) }
+        }
+        if args.contains("--show-usage") {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in self?.usageWindow.show() }
+        }
+        if args.contains("--show-menu") {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 5) { [weak self] in self?.statusItem?.button?.performClick(nil) }   // 사용량 기록을 다 읽은 뒤
         }
     }
 
@@ -247,7 +274,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTouchBarDelegate, NS
         alert.runModal()
     }
 
-    @objc private func toggleConnect() {
+    private func toggleConnect() {
         if ClaudeSetup.isConnected {
             try? ClaudeSetup.disconnect()
             defaults.set(true, forKey: Key.declined)
@@ -256,7 +283,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTouchBarDelegate, NS
         }
     }
 
-    @objc private func toggleLogin() {
+    private func toggleLogin() {
         ClaudeSetup.launchesAtLogin.toggle()
     }
 
@@ -288,6 +315,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTouchBarDelegate, NS
 
     private func addPetWindow() {
         let w = PetWindow(px: desktopPixel, link: world.link, slot: petWindows.count)
+        w.world.species = Species.current
         w.onAddPet = { [weak self] in self?.addPet() }
         w.onTreat = { [weak self] treat, source in
             guard let self else { return }
@@ -307,7 +335,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTouchBarDelegate, NS
         petWindows.append(w)
     }
 
-    @objc private func toggleDesktop() {
+    private func toggleDesktop() {
         desktopMode.toggle()
         if desktopMode {
             if isShowing { hideFromTouchBar() }
@@ -341,7 +369,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTouchBarDelegate, NS
             self.menuBarPet?.world.busy = busy
             self.metricsView.tick()
             self.usageView.tick()
-            self.usagePanel?.refresh()
+            self.usageWindow.refresh()
             self.statsTicks += 1
             if self.statsTicks % 60 == 5 { UsageLimits.autoCalibrate(self.stats) }   // 상태줄이 공식 %를 주면 기준을 다시 맞춘다
         }
@@ -364,7 +392,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTouchBarDelegate, NS
         switch identifier {
         case Self.barID:
             let item = NSCustomTouchBarItem(identifier: identifier)
-            item.view = playground
+            item.view = barContainer
             return item
         case Self.metricsID:
             let item = NSCustomTouchBarItem(identifier: identifier)
@@ -374,37 +402,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTouchBarDelegate, NS
             let item = NSCustomTouchBarItem(identifier: identifier)
             item.view = usageView
             return item
-        case Self.brightnessID:
-            return NSGroupTouchBarItem(identifier: identifier, items: [
-                controlButton("brightness-down", "sun.min.fill", #selector(brightnessDown)),
-                controlButton("brightness-up", "sun.max.fill", #selector(brightnessUp)),
-            ])
-        case Self.volumeID:
-            let mute = controlButton("mute", "speaker.slash.fill", #selector(toggleMute), repeats: false)
-            muteButton = mute.view as? NSButton
-            syncMuteButton()
-            return NSGroupTouchBarItem(identifier: identifier, items: [
-                mute,
-                controlButton("volume-down", "speaker.wave.1.fill", #selector(volumeDown)),
-                controlButton("volume-up", "speaker.wave.3.fill", #selector(volumeUp)),
-            ])
+        case Self.controlsID:
+            let item = NSCustomTouchBarItem(identifier: identifier)
+            item.view = controlPad
+            return item
         default:
             return nil
         }
     }
 
     /// 누르고 있으면 계속 조절되는 밝기·소리 버튼
-    private func controlButton(_ name: String, _ symbol: String, _ action: Selector, repeats: Bool = true) -> NSCustomTouchBarItem {
-        let item = NSCustomTouchBarItem(identifier: NSTouchBarItem.Identifier("com.local.ClaudeTouchBar." + name))
-        let image = NSImage(systemSymbolName: symbol, accessibilityDescription: name) ?? NSImage()
+    private func controlButton(_ symbol: String, _ action: Selector, repeats: Bool = true) -> NSButton {
+        let image = NSImage(systemSymbolName: symbol, accessibilityDescription: symbol) ?? NSImage()
         let button = NSButton(image: image, target: self, action: action)
         if repeats {
             button.isContinuous = true
             button.setPeriodicDelay(0.35, interval: 0.08)
         }
-        button.widthAnchor.constraint(equalToConstant: Self.controlWidth).isActive = true
-        item.view = button
-        return item
+        return button
     }
 
     private func syncMuteButton() {
@@ -443,7 +458,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTouchBarDelegate, NS
     /// Control Strip에 작은 Clawd 버튼을 달아서, 눌러서 놀이터를 열고 닫을 수 있게 한다.
     private func installTrayItem() {
         let item = NSCustomTouchBarItem(identifier: Self.trayID)
-        item.view = NSButton(image: ClawdSprite.icon(px: 1.5), target: self, action: #selector(toggleTouchBar))
+        item.view = NSButton(image: Species.current.icon(px: 1.5), target: self, action: #selector(toggleTouchBar))
         TouchBarPrivate.addSystemTrayItem(item)
         TouchBarPrivate.setControlStripPresence(Self.trayID, true)
         trayItem = item
@@ -451,8 +466,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTouchBarDelegate, NS
 
     private func showOnTouchBar() {
         touchBar.defaultItemIdentifiers = [Self.barID] + (hasUsage ? [Self.usageID] : []) + (hasMetrics ? [Self.metricsID] : [])
-            + (hasControls ? [Self.brightnessID, Self.volumeID] : [])
+            + (hasControls && !padJoinsBar ? [Self.controlsID] : [])
         playground.preferredWidth = barWidth
+        barContainer.setPad(padJoinsBar ? controlPad : nil)
         TouchBarPrivate.showsCloseBoxWhenFrontmost(true)
         TouchBarPrivate.present(touchBar, placement: useWide ? 1 : 0, trayItem: Self.trayID)
         playground.start()
@@ -495,131 +511,201 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTouchBarDelegate, NS
         statusItem = item
     }
 
-    /// 메뉴 막대 메뉴. 언어를 바꾸면 새로 만든다.
+    /// 메뉴 막대 메뉴: 자주 하는 것만. 사용량과 설정은 창으로 연다. 언어를 바꾸면 새로 만든다.
     private func makeMenu() -> NSMenu {
         let menu = NSMenu()
         menu.delegate = self
         menu.autoenablesItems = false
-        countItem = menu.addItem(withTitle: "", action: nil, keyEquivalent: "")
-        countItem.isEnabled = false
-        linkItem = menu.addItem(withTitle: "", action: nil, keyEquivalent: "")
-        linkItem.isEnabled = false
-        menu.addItem(.separator())
-        // Mac 상태와 Claude 사용량은 탭으로 나눠 한 판에
-        let panel = UsagePanel(stats: stats) { [weak self] in self?.showCalibration() }
-        let panelItem = NSMenuItem()
-        panelItem.view = panel
-        menu.addItem(panelItem)
-        usagePanel = panel
-        menu.addItem(.separator())
-        let sourceMenu = NSMenu()
-        sourceItems = RunnerSource.allCases.map { source in
-            let choice = sourceMenu.addItem(withTitle: source.title, action: #selector(chooseSource(_:)), keyEquivalent: "")
-            choice.representedObject = source.rawValue
-            choice.target = self
-            return choice
-        }
-        let sourceItem = menu.addItem(withTitle: tr("달리기 기준", "Run speed follows"), action: nil, keyEquivalent: "")
-        sourceItem.submenu = sourceMenu
+        statusLineItem = menu.addItem(withTitle: "", action: nil, keyEquivalent: "")
+        statusLineItem.isEnabled = false
         menu.addItem(.separator())
         showItem = menu.addItem(withTitle: tr("Touch Bar에 보이기", "Show on Touch Bar"), action: #selector(toggleTouchBar), keyEquivalent: "")
-        desktopItem = menu.addItem(withTitle: tr("화면 위에 띄우기 (Touch Bar 없이)", "Float on screen (no Touch Bar)"), action: #selector(toggleDesktop), keyEquivalent: "")
-        menu.addItem(.separator())
-        menu.addItem(withTitle: tr("완료 알림 모두 확인", "Mark all done notices read"), action: #selector(acknowledgeAll), keyEquivalent: "")
+        treatItem = menu.addItem(withTitle: "", action: #selector(dropTreat), keyEquivalent: "")
+        addItem = menu.addItem(withTitle: "", action: #selector(addPet), keyEquivalent: "")
+        removeItem = menu.addItem(withTitle: "", action: #selector(removePet), keyEquivalent: "")
         menu.addItem(withTitle: tr("💡 아이디어", "💡 Ideas"), action: nil, keyEquivalent: "").submenu = ideasMenu
-        menu.addItem(withTitle: tr("간식 떨어뜨리기 ✻", "Drop a treat ✻"), action: #selector(dropTreat), keyEquivalent: "")
-        addItem = menu.addItem(withTitle: tr("Clawd 한 마리 더", "Add a Clawd"), action: #selector(addPet), keyEquivalent: "")
-        removeItem = menu.addItem(withTitle: tr("Clawd 한 마리 보내기", "Send a Clawd home"), action: #selector(removePet), keyEquivalent: "")
+        acknowledgeItem = menu.addItem(withTitle: "", action: #selector(acknowledgeAll), keyEquivalent: "")
         menu.addItem(.separator())
-        bigItem = menu.addItem(withTitle: tr("크게 보기", "Bigger Clawds"), action: #selector(toggleBig), keyEquivalent: "")
-        wideItem = menu.addItem(withTitle: tr("넓게 쓰기 (Control Strip 가리기)", "Full width (cover Control Strip)"), action: #selector(toggleWide), keyEquivalent: "")
-        controlsItem = menu.addItem(withTitle: tr("밝기·소리 버튼", "Brightness & volume buttons"), action: #selector(toggleControls), keyEquivalent: "")
-        usageBarItem = menu.addItem(withTitle: tr("Touch Bar에 Claude 사용량 보기", "Claude usage on Touch Bar"), action: #selector(toggleUsageBar), keyEquivalent: "")
-        levelHUDItem = menu.addItem(withTitle: tr("소리·밝기 바꿀 때 화면에도 Clawd 보이기", "Show Clawd on screen for volume & brightness"), action: #selector(toggleLevelHUD), keyEquivalent: "")
-        metricsItem = menu.addItem(withTitle: tr("Touch Bar에 Mac 상태 보기", "Mac stats on Touch Bar"), action: #selector(toggleMetrics), keyEquivalent: "")
-        menuBarPetItem = menu.addItem(withTitle: tr("메뉴 막대에서 돌아다니기", "Roam the menu bar"), action: #selector(toggleMenuBarPet), keyEquivalent: "")
-        menu.addItem(.separator())
-        // Claude가 일을 마치면 소리로 알리기 (고르면 미리 들려준다)
-        let soundMenu = NSMenu()
-        doneSoundItems = ([""] + Self.doneSounds).map { name in
-            let option = soundMenu.addItem(withTitle: name.isEmpty ? tr("끄기", "Off") : name, action: #selector(chooseDoneSound(_:)), keyEquivalent: "")
-            option.representedObject = name
-            option.target = self
-            return option
-        }
-        menu.addItem(withTitle: tr("완료되면 소리로 알리기", "Sound when Claude finishes"), action: nil, keyEquivalent: "").submenu = soundMenu
-        connectItem = menu.addItem(withTitle: tr("Claude Code 연결", "Connect Claude Code"), action: #selector(toggleConnect), keyEquivalent: "")
-        loginItem = menu.addItem(withTitle: tr("로그인할 때 자동 실행", "Open at login"), action: #selector(toggleLogin), keyEquivalent: "")
-        // 어느 언어로 보고 있든 찾을 수 있게 두 언어로 쓴다
-        let languageMenu = NSMenu()
-        languageItems = L10n.Choice.allCases.map { choice in
-            let title: String
-            switch choice {
-            case .auto: title = tr("자동 (Mac 언어 따라)", "Auto (match Mac)")
-            case .english: title = "English"
-            case .korean: title = "한국어"
-            }
-            let option = languageMenu.addItem(withTitle: title, action: #selector(chooseLanguage(_:)), keyEquivalent: "")
-            option.representedObject = choice.rawValue
-            option.target = self
-            return option
-        }
-        menu.addItem(withTitle: "언어 · Language", action: nil, keyEquivalent: "").submenu = languageMenu
+        usageItem = menu.addItem(withTitle: "", action: #selector(openUsage), keyEquivalent: "u")
+        menu.addItem(withTitle: tr("설정…", "Settings…"), action: #selector(openSettings), keyEquivalent: ",")
         menu.addItem(.separator())
         menu.addItem(withTitle: tr("종료", "Quit"), action: #selector(quit), keyEquivalent: "q")
         for menuItem in menu.items where menuItem.action != nil { menuItem.target = self }
         return menu
     }
 
-    @objc private func chooseLanguage(_ sender: NSMenuItem) {
-        guard let raw = sender.representedObject as? String, let choice = L10n.Choice(rawValue: raw) else { return }
+    func menuNeedsUpdate(_ menu: NSMenu) {
+        guard menu !== ideasMenu else { return }
+        rebuildIdeasMenu()
+        let name = Species.current.title
+        statusLineItem.title = "\(name) × \(petTotal)" + (world.link.map { " · " + $0.summaryLine } ?? "")
+        // 화면 위 모드에선 Touch Bar를 쓰지 않는다
+        showItem.isHidden = desktopMode
+        showItem.state = isShowing || previewMode ? .on : .off
+        treatItem.title = Species.current.treatTitle
+        addItem.title = tr("\(name) 한 마리 더", "Add a \(name)")
+        addItem.isEnabled = petTotal < Self.maxPets
+        removeItem.title = tr("\(name) 한 마리 보내기", "Send a \(name) home")
+        removeItem.isEnabled = petTotal > 1
+        // 확인 안 한 완료 알림이 있을 때만
+        let unread = world.link?.unreadDones ?? 0
+        acknowledgeItem.isHidden = unread == 0
+        acknowledgeItem.title = tr("완료 알림 \(unread)개 모두 확인", unread == 1 ? "Mark 1 done notice read" : "Mark \(unread) done notices read")
+        // 창을 열지 않아도 한도 %는 한눈에
+        let five = UsageLimits.fiveHour(stats).percent, week = UsageLimits.weekly(stats).percent
+        let glance = [five.map { tr("5시간 ", "5h ") + $0 }, week.map { tr("주간 ", "week ") + $0 }].compactMap { $0 }.joined(separator: " · ")
+        let title = NSMutableAttributedString(string: tr("사용량·Mac 상태 보기…", "Usage & Mac stats…"), attributes: [.font: NSFont.menuFont(ofSize: 0)])
+        if !glance.isEmpty {
+            title.append(NSAttributedString(string: "   " + glance, attributes: [.font: NSFont.menuFont(ofSize: 0), .foregroundColor: NSColor.secondaryLabelColor]))
+        }
+        usageItem.attributedTitle = title
+    }
+
+    @objc private func openUsage() {
+        usageWindow.show()
+    }
+
+    // MARK: - 설정 창
+
+    @objc private func openSettings() {
+        settings.show()
+    }
+
+    /// 지금 몇 마리인지 (Touch Bar든 화면 위든)
+    private var petTotal: Int { desktopMode ? petWindows.count : world.pets.count }
+
+    private func settingsPanes() -> [SettingsPane] {
+        typealias Option = SettingRow.Option
+        let species = Species.allCases.map { Option(title: $0.title, image: $0.icon(px: $0 == .clawd ? 1 : 1.5, outline: true), value: $0.rawValue) }
+        let languages = L10n.Choice.allCases.map { choice -> Option in
+            switch choice {
+            case .auto: return Option(title: tr("자동 (Mac 언어 따라)", "Auto (match Mac)"), value: choice.rawValue)
+            case .english: return Option(title: "English", value: choice.rawValue)
+            case .korean: return Option(title: "한국어", value: choice.rawValue)
+            }
+        }
+        let livesOn = { [weak self] in self?.desktopMode == true ? "desktop" : "touchBar" }
+        let setLivesOn = { [weak self] (value: String) -> Void in self?.setDesktopMode(value == "desktop") }
+        let general = SettingsPane(title: tr("일반", "General"), symbol: "gearshape", rows: [
+            SettingRow(label: tr("캐릭터", "Character"),
+                       control: .popup(species, get: { Species.current.rawValue },
+                                       set: { [weak self] in Species(rawValue: $0).map { self?.setSpecies($0) } })),
+            SettingRow(label: tr("크기", "Size"),
+                       control: .toggle(tr("크게 보기", "Bigger"), get: { [weak self] in self?.big ?? true }, set: { [weak self] _ in self?.toggleBig() })),
+            SettingRow(label: tr("사는 곳", "Lives on"),
+                       control: .radio(Option(title: "Touch Bar", value: "touchBar"), get: livesOn, set: setLivesOn),
+                       note: { ClaudeSetup.hasTouchBar ? nil : tr("이 Mac에는 Touch Bar가 없어요", "This Mac has no Touch Bar") },
+                       enabled: { [weak self] in self?.previewMode == false }),
+            SettingRow(control: .radio(Option(title: tr("화면 위에 띄우기", "Floating on screen"), value: "desktop"), get: livesOn, set: setLivesOn),
+                       enabled: { [weak self] in self?.previewMode == false }),
+            SettingRow(control: .toggle(tr("메뉴 막대에서도 돌아다니기", "Also roam the menu bar"),
+                                        get: { [weak self] in self?.menuBarPet?.isShowing == true }, set: { [weak self] _ in self?.toggleMenuBarPet() }),
+                       enabled: { [weak self] in self?.menuBarPet != nil }),
+            SettingRow(label: tr("달리는 기준", "Runs with"),
+                       control: .popup(RunnerSource.allCases.map { Option(title: $0.title, value: $0.rawValue) },
+                                       get: { [weak self] in self?.runnerSource.rawValue ?? "" },
+                                       set: { [weak self] in RunnerSource(rawValue: $0).map { self?.setRunnerSource($0) } }),
+                       note: { tr("Mac이 바쁠수록 빨리 달려요. 메뉴 막대 아이콘도 같은 박자로", "The busier your Mac, the faster it runs, menu bar icon included") }),
+            SettingRow(label: tr("소리·밝기", "Volume & brightness"),
+                       control: .toggle(tr("바꿀 때 화면에도 크게 보이기", "Also show big on screen when changed"),
+                                        get: { [weak self] in self?.showLevelHUD ?? true }, set: { [weak self] _ in self?.toggleLevelHUD() }),
+                       note: { tr("Dock 바로 위에서 바를 들고 2초쯤 보였다 사라져요", "Holds the level bar just above the Dock for about 2 seconds") },
+                       enabled: { [weak self] in self?.previewMode == false }),
+            SettingRow(label: "언어 · Language",   // 어느 언어로 보고 있든 찾을 수 있게
+                       control: .popup(languages, get: { L10n.choice.rawValue },
+                                       set: { [weak self] in L10n.Choice(rawValue: $0).map { self?.setLanguage($0) } })),
+            SettingRow(label: tr("시작", "Startup"),
+                       control: .toggle(tr("로그인할 때 자동 실행", "Open at login"), get: { ClaudeSetup.launchesAtLogin },
+                                        set: { [weak self] _ in self?.toggleLogin() }),
+                       enabled: { ClaudeSetup.canAutoLaunch }),
+        ])
+
+        let touchBarOnly = { [weak self] in self.map { !$0.previewMode && !$0.desktopMode } ?? false }
+        let touchBar = SettingsPane(title: "Touch Bar", symbol: "slider.horizontal.below.rectangle", rows: [
+            SettingRow(label: tr("폭", "Width"),
+                       control: .toggle(tr("넓게 쓰기 (Control Strip 가리기)", "Full width (cover the Control Strip)"),
+                                        get: { [weak self] in self?.useWide ?? false }, set: { [weak self] _ in self?.toggleWide() }),
+                       note: { [weak self] in
+                           guard let self else { return nil }
+                           if self.desktopMode { return tr("지금은 화면 위에 띄우는 중이라 Touch Bar를 쓰지 않아요", "Clawd is floating on screen now, so the Touch Bar isn't used") }
+                           return self.controlStripOnly ? tr("Touch Bar가 확장된 Control Strip 모드라서 늘 넓게 보여요", "Your Touch Bar uses the Expanded Control Strip, so it's always full width") : nil
+                       },
+                       enabled: { [weak self] in touchBarOnly() && self?.controlStripOnly == false }),
+            SettingRow(label: tr("옆에 함께", "Next to Clawd"),
+                       control: .toggle(tr("Claude 사용량", "Claude usage"), get: { [weak self] in self?.showUsage ?? true },
+                                        set: { [weak self] _ in self?.toggleUsageBar() }),
+                       enabled: touchBarOnly),
+            SettingRow(control: .toggle(tr("Mac 상태", "Mac stats"), get: { [weak self] in self?.showMetrics ?? true },
+                                        set: { [weak self] _ in self?.toggleMetrics() }),
+                       enabled: touchBarOnly),
+            SettingRow(control: .toggle(tr("밝기·소리 버튼", "Brightness & volume buttons"), get: { [weak self] in self?.showControls ?? true },
+                                        set: { [weak self] _ in self?.toggleControls() }),
+                       note: { tr("넓게 쓸 때 Control Strip 대신 달아요", "Shown in full width, in place of the Control Strip") },
+                       enabled: { [weak self] in touchBarOnly() && self?.useWide == true }),
+        ])
+
+        let soundOptions = ([""] + Self.doneSounds).map { Option(title: $0.isEmpty ? tr("끄기", "Off") : $0, value: $0) }
+        let claude = SettingsPane(title: "Claude", symbol: "sparkle", rows: [
+            SettingRow(label: tr("Claude Code", "Claude Code"),
+                       control: .actions(status: { ClaudeSetup.isConnected ? tr("✓ 연결됨", "✓ Connected") : tr("연결 안 됨", "Not connected") },
+                                         [SettingRow.Action(title: { ClaudeSetup.isConnected ? tr("연결 끊기", "Disconnect") : tr("연결하기", "Connect") },
+                                                            run: { [weak self] in self?.toggleConnect() })]),
+                       note: { tr("훅을 넣어 Claude가 일하면 따라 움직여요. 새로 시작한 세션부터 적용돼요", "Adds hooks so Clawd follows Claude. Applies to sessions started afterwards") }),
+            SettingRow(label: tr("완료 소리", "Done sound"),
+                       control: .popup(soundOptions, get: { [weak self] in self?.defaults.string(forKey: Key.doneSound) ?? "" },
+                                       set: { [weak self] in self?.setDoneSound($0) }),
+                       note: { tr("Claude가 일을 마치면 울려요. 고르면 미리 들려줘요", "Plays when Claude finishes. Picking one plays a preview") }),
+            SettingRow(label: tr("사용량 한도", "Usage limits"),
+                       control: .actions(status: nil, [
+                           SettingRow.Action(title: { tr("한도 맞추기…", "Calibrate…") }, run: { [weak self] in self?.showCalibration() }),
+                           SettingRow.Action(title: { tr("claude.ai 사용량 열기", "Open claude.ai usage") },
+                                             run: { NSWorkspace.shared.open(URL(string: "https://claude.ai/settings/usage")!) }),
+                       ]),
+                       note: { [weak self] in self?.calibrationNote() }),
+        ])
+        return [general, touchBar, claude]
+    }
+
+    /// 한도를 무엇으로 맞췄는지
+    private func calibrationNote() -> String {
+        if let usage = stats.claude, usage.isFresh, usage.sevenDay != nil {
+            return tr("터미널 claude의 상태줄에서 공식 %를 받고 있어요", "Getting the official % from the claude status line")
+        }
+        if let calibration = UsageCalibration.current, calibration.weeklyLimit != nil {
+            let day = calibration.updated.formatted(.dateTime.month(.defaultDigits).day().locale(Locale(identifier: tr("ko_KR", "en_US"))))
+            return calibration.fromStatusLine
+                ? tr("\(day)에 터미널 상태줄로 저절로 맞췄어요. claude.ai와 다르면 다시 맞춰 주세요", "Synced from the claude status line on \(day). Calibrate again if it drifts from claude.ai")
+                : tr("\(day)에 맞췄어요. claude.ai와 다르면 다시 맞춰 주세요", "Calibrated on \(day). Calibrate again if it drifts from claude.ai")
+        }
+        return tr("claude.ai의 주간 %를 한 번 넣으면 계속 따라가요. 터미널에서 claude를 쓰면 저절로 맞춰져요", "Enter your weekly % from claude.ai once to keep tracking it. Using claude in a terminal syncs it automatically")
+    }
+
+    // MARK: - 설정 바꾸기
+
+    private func setLanguage(_ choice: L10n.Choice) {
+        guard choice != L10n.choice else { return }
         L10n.choice = choice
         // 아이디어 하위 메뉴는 계속 쓰니까 옛 메뉴에서 떼어 낸다 (한 메뉴는 한 곳에만 달 수 있다)
         statusItem?.menu?.items.forEach { if $0.submenu === ideasMenu { $0.submenu = nil } }
         statusItem?.menu = makeMenu()
         previewWindow?.title = tr("Clawd Pet 미리보기", "Clawd Pet Preview")
         for place in [world, menuBarPet?.world] + petWindows.map(\.world) { place?.relocalize() }
+        // 설정 창도 새 말로 (이 함수는 설정 창의 팝업에서 불리므로 다음 차례에)
+        DispatchQueue.main.async { [weak self] in
+            self?.settings.rebuild()
+            self?.usageWindow.rebuild()
+        }
     }
 
-    func menuNeedsUpdate(_ menu: NSMenu) {
-        guard menu !== ideasMenu else { return }
-        rebuildIdeasMenu()
-        countItem.title = "Clawd × \(desktopMode ? petWindows.count : world.pets.count)"
-        linkItem.title = world.link?.summaryLine ?? ""
-        stats.tokens.refresh { [weak self] in self?.usagePanel?.refresh() }   // 새로 쌓인 기록까지
-        usagePanel?.refresh()
-        for choice in sourceItems {
-            choice.state = choice.representedObject as? String == runnerSource.rawValue ? .on : .off
-        }
-        for option in languageItems {
-            option.state = option.representedObject as? String == L10n.choice.rawValue ? .on : .off
-        }
-        showItem.state = isShowing || previewMode ? .on : .off
-        showItem.isEnabled = !desktopMode
-        desktopItem.state = desktopMode ? .on : .off
-        desktopItem.isEnabled = !previewMode
-        let count = desktopMode ? petWindows.count : world.pets.count
-        addItem.isEnabled = count < Self.maxPets
-        removeItem.isEnabled = count > 1
-        bigItem.state = big ? .on : .off
-        wideItem.state = useWide ? .on : .off
-        wideItem.isEnabled = !previewMode && !controlStripOnly
-        wideItem.toolTip = controlStripOnly ? tr("Touch Bar가 확장된 Control Strip 모드라서 항상 넓게 표시돼요", "Your Touch Bar uses the Expanded Control Strip, so Clawd always uses the full width") : nil
-        controlsItem.state = showControls ? .on : .off
-        controlsItem.isEnabled = useWide && !previewMode
-        metricsItem.state = showMetrics ? .on : .off
-        usageBarItem.state = showUsage ? .on : .off
-        levelHUDItem.state = showLevelHUD ? .on : .off
-        let sound = defaults.string(forKey: Key.doneSound) ?? ""
-        for option in doneSoundItems { option.state = option.representedObject as? String == sound ? .on : .off }
-        levelHUDItem.isEnabled = !previewMode
-        usageBarItem.isEnabled = !previewMode
-        menuBarPetItem.state = menuBarPet?.isShowing == true ? .on : .off
-        menuBarPetItem.isEnabled = menuBarPet != nil
-        metricsItem.isEnabled = !previewMode
-        connectItem.title = ClaudeSetup.isConnected ? tr("Claude Code 연결 끊기", "Disconnect Claude Code") : tr("Claude Code 연결", "Connect Claude Code")
-        loginItem.state = ClaudeSetup.launchesAtLogin ? .on : .off
-        loginItem.isEnabled = ClaudeSetup.canAutoLaunch
+    private func setDesktopMode(_ on: Bool) {
+        guard on != desktopMode else { return }
+        toggleDesktop()
+    }
+
+    private func setRunnerSource(_ source: RunnerSource) {
+        runnerSource = source
+        world.busy = stats.value(for: source)
+        metricsView.busy = world.busy
     }
 
     // MARK: - 한도 맞추기
@@ -709,29 +795,35 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTouchBarDelegate, NS
         menuBarPet?.petCount = petCount
     }
 
-    @objc private func toggleBig() {
+    private func toggleBig() {
         big.toggle()
         world.px = big ? 2 : 1.5
         for w in petWindows { w.setPixel(desktopPixel) }
     }
 
-    @objc private func chooseSource(_ sender: NSMenuItem) {
-        guard let raw = sender.representedObject as? String, let source = RunnerSource(rawValue: raw) else { return }
-        runnerSource = source
-        world.busy = stats.value(for: source)
-        metricsView.busy = world.busy
-    }
-
-    @objc private func toggleMenuBarPet() {
+    private func toggleMenuBarPet() {
         guard let menuBarPet else { return }
         let show = !menuBarPet.isShowing
         defaults.set(show, forKey: Key.menuBarPet)
         show ? menuBarPet.show() : menuBarPet.hide()
     }
 
-    @objc private func toggleMetrics() {
+    private func toggleMetrics() {
         showMetrics.toggle()
         representIfShowing()
+    }
+
+    // MARK: - 캐릭터
+
+    private func setSpecies(_ species: Species) {
+        Species.current = species
+        for place in [world, menuBarPet?.world] + petWindows.map(\.world) { place?.species = species }
+        levelHUD.species = species
+        runnerImages = RunnerClock.menuBarImages(px: 1.5, species: species)
+        statusItem?.button?.image = runnerImages[runner.frame]
+        (trayItem?.view as? NSButton)?.image = species.icon(px: 1.5)
+        barContainer.refresh()
+        metricsView.needsDisplay = true
     }
 
     // MARK: - 완료 알림 소리
@@ -743,29 +835,28 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSTouchBarDelegate, NS
         NSSound(named: NSSound.Name(name))?.play()
     }
 
-    @objc private func chooseDoneSound(_ sender: NSMenuItem) {
-        let name = sender.representedObject as? String ?? ""
+    private func setDoneSound(_ name: String) {
         defaults.set(name, forKey: Key.doneSound)
         if !name.isEmpty { NSSound(named: NSSound.Name(name))?.play() }   // 미리 듣기
     }
 
-    @objc private func toggleLevelHUD() {
+    private func toggleLevelHUD() {
         showLevelHUD.toggle()
         // 켜자마자 어떻게 보이는지 한 번 보여 준다
         if showLevelHUD, let volume = SystemControls.volume { levelHUD.show(SystemControls.isMuted ? .muted : .volume, level: SystemControls.isMuted ? 0 : volume) }
     }
 
-    @objc private func toggleUsageBar() {
+    private func toggleUsageBar() {
         showUsage.toggle()
         representIfShowing()
     }
 
-    @objc private func toggleControls() {
+    private func toggleControls() {
         showControls.toggle()
         representIfShowing()
     }
 
-    @objc private func toggleWide() {
+    private func toggleWide() {
         wide.toggle()
         representIfShowing()
     }

@@ -25,6 +25,7 @@ enum Snapshot {
 
         // 나머지 행: 실제 시뮬레이션
         let world = Playground()
+        world.species = Species.current
         world.width = width
         world.px = 2
         world.addPet(at: 90)

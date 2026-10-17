@@ -33,7 +33,7 @@ When Claude rests, Clawd plays. When Claude works, Clawd works too.
   </tr>
 </table>
 
-<sub>Filmed on a Korean Mac, so the bubbles are in Korean. On an English Mac, Clawd speaks English, and you can switch anytime from the menu (**언어 · Language**).</sub>
+<sub>Filmed on a Korean Mac, so the bubbles are in Korean. On an English Mac, Clawd speaks English, and you can switch anytime in **Settings… → General → Language**.</sub>
 
 > **Unofficial fan project.** Made for fun, not affiliated with Anthropic. Claude and Clawd are Anthropic's trademarks and character. Non-commercial.
 
@@ -69,7 +69,7 @@ Running several Claude Code sessions? Add more Clawds. Each one takes a session.
 3. When asked **"Connect Clawd to Claude Code?"**, click **Connect**. The app adds its hooks to your Claude Code settings for you. No terminal needed.
 4. **Start a new Claude Code session**, and Clawd starts following along.
 
-**What "Connect" does:** it adds hooks and a status line to `~/.claude/settings.json`. Your other settings stay untouched, and the original file is backed up as `settings.json.bak-clawd`. You can undo it anytime from the Clawd menu in the menu bar with **Disconnect Claude Code**. To start Clawd automatically, turn on **Open at login** in the same menu.
+**What "Connect" does:** it adds hooks and a status line to `~/.claude/settings.json`. Your other settings stay untouched, and the original file is backed up as `settings.json.bak-clawd`. You can undo it anytime from the Clawd menu in the menu bar: **Settings… → Claude → Disconnect**. To start Clawd automatically, turn on **Settings… → General → Open at login**.
 
 ### Build from source
 
@@ -99,8 +99,8 @@ If Xcode Command Line Tools aren't installed, an installer pops up. Click **Inst
 | done | hops with `Done! (first sentence of Claude's answer)`. Click it to bring that session's app (Terminal, Claude desktop…) to the front |
 
 - The **topic** is the session title shown in the Claude app's sidebar. If there is none yet, Clawd shows the start of your request.
-- **It chimes when Claude finishes.** Pick the sound (Glass, Ping, Pop, Purr, Hero, Tink, Submarine) or turn it off under **Sound when Claude finishes** in the menu. Picking one plays a preview. Glass by default.
-- **Done notices stay until you check them**, even after a restart. Click Clawd or its bubble (or tap it on the Touch Bar), send that session a new request, or choose **Mark all done notices read**.
+- **It chimes when Claude finishes.** Pick the sound (Glass, Ping, Pop, Purr, Hero, Tink, Submarine) or turn it off under **Settings… → Claude → Done sound**. Picking one plays a preview. Glass by default.
+- **Done notices stay until you check them**, even after a restart. Click Clawd or its bubble (or tap it on the Touch Bar), send that session a new request, or choose **Mark N done notices read** in the menu.
 
 ### Long task? Clawd gets grumpy
 
@@ -144,16 +144,16 @@ If Xcode Command Line Tools aren't installed, an installer pops up. Click **Inst
 - Change the volume or brightness (with Clawd's Touch Bar keys, your keyboard, anywhere) and a Clawd holds a 16-step level bar over its head. If one is on clock duty, it swaps the clock for the bar.
 - **Volume**: happy eyes when it's quiet → sound lines `( )` as it gets louder → squinting around 70% → `> <` eyes and shaking above 80%. Muted: eyes closed, at peace.
 - **Brightness**: sleepy eyes when it's dim → sunglasses that get darker as it gets brighter → jet-black shades with a glint above 90%.
-- **On screen too**: with **Show Clawd on screen for volume & brightness** on (default), a big Clawd pops up just above your Dock for about 2 seconds. Clicks pass right through, and slow auto-brightness changes are ignored.
+- **On screen too**: with **Settings… → General → Volume & brightness** on (default), a big Clawd pops up just above your Dock for about 2 seconds. Clicks pass right through, and slow auto-brightness changes are ignored.
 
 ### Claude usage
 
-<p align="center"><img src="docs/en/usage/usage-menu.png" width="100%" alt="The Claude usage tab in the menu (5-hour limit 42%, weekly limit 58%, bars for the last 7 days) next to the Mac tab"></p>
+<p align="center"><img src="docs/en/usage/usage-menu.png" width="100%" alt="The Claude usage tab in the usage window (5-hour limit 42%, weekly limit 58%, bars for the last 7 days) next to the Mac tab"></p>
 
 <p align="center"><img src="docs/en/usage/usage-touchbar.gif" width="100%" alt="The Touch Bar usage display flips between the 5-hour limit, the weekly limit and the last 7 days"></p>
 
-- **Menu bar menu → Claude usage tab**: your **5-hour** and **weekly** limits as big % gauges with reset time and time left, plus a bar and token count for each of the last 7 days. The **Mac** tab next to it shows CPU, GPU, memory, storage, battery and network.
-- **Touch Bar**: `5h 42% · ↻ 3h27m` → `7d 58% · ↻ 4d19h` → `7d 793M` with a bar per day, every 5 seconds. Tap to flip. Toggle it with **Claude usage on Touch Bar**.
+- **Menu → Usage & Mac stats…** (⌘U): the menu line itself shows `5h 42% · week 58%`, and clicking it opens a window. The **Claude usage** tab shows your **5-hour** and **weekly** limits as big % gauges with reset time and time left, plus a bar and token count for each of the last 7 days. The **Mac** tab next to it shows CPU, GPU, memory, storage, battery and network.
+- **Touch Bar**: `5h 42% · ↻ 3h27m` → `7d 58% · ↻ 4d19h` → `7d 793M` with a bar per day, every 5 seconds. Tap to flip. Toggle it under **Settings… → Touch Bar → Next to Clawd: Claude usage**.
 
 #### Calibrate once (to see your weekly %)
 
@@ -161,7 +161,7 @@ If Xcode Command Line Tools aren't installed, an installer pops up. Click **Inst
 
 Only Anthropic knows your official limit %, and the desktop app doesn't share it with other apps. So tell Clawd once:
 
-1. Menu → **Claude usage** tab → **Calibrate…**
+1. Menu → **Usage & Mac stats…** → **Claude usage** tab → **Calibrate…** (also in **Settings… → Claude**)
 2. Click **Open usage page** to open claude.ai → Settings → Usage, then type in your **weekly %** and its **reset day and time** (and the 5-hour % if you like), and **Save**.
 3. Clawd compares that with this Mac's Claude Code logs (`~/.claude/projects`) to estimate your limits, then keeps tracking the % as you go.
 
@@ -169,14 +169,21 @@ Only Anthropic knows your official limit %, and the desktop app doesn't share it
 - Without calibration, the 5-hour gauge compares against your own history (the last time you hit the limit, or else your busiest 5 hours this week). The gray tag next to each title says what the % is relative to.
 - Usage is weighted by price (output ×5, cache reads ×0.1), since cache reads are plentiful but light on your limit. Usage from other devices or claude.ai chat isn't in this Mac's logs, so the estimate can drift. Re-calibrate now and then.
 
-### The menu bar menu
+### Menu and settings
 
-Click the running Clawd icon in the menu bar to:
-- see Claude's status and the **Mac | Claude usage** tabs (see [Claude usage](#claude-usage); it remembers your pick)
-- mark done notices read, browse 💡 ideas, drop a treat, add or send home a Clawd
-- choose what makes Clawd run (CPU, memory or GPU), toggle the menu bar Clawds, Touch Bar options (Claude usage, Mac stats, brightness & volume keys) and the on-screen Clawd for volume & brightness
-- pick the finish sound (or turn it off), connect or disconnect Claude Code, open at login
-- switch the language under **언어 · Language**: Auto (match your Mac), English or 한국어. Menus and bubbles change right away, and the choice sticks
+Click the running Clawd icon in the menu bar for a short menu of the things you do often:
+- how many Clawds and what Claude is up to, at the top
+- Show on Touch Bar, drop a treat, add or send home a Clawd, 💡 ideas, and mark done notices read (only when there are some)
+- **Usage & Mac stats…** (⌘U): your 5-hour and weekly % right on the menu line; click it for the **Mac | Claude usage** window (it remembers your tab)
+- **Settings…** (⌘,) and Quit
+
+Everything you rarely change lives in **Settings…**, in three tabs:
+
+| Tab | What's there |
+|---|---|
+| General | character, bigger size, where it lives (Touch Bar / floating on screen), also roam the menu bar, what makes it run (CPU, memory or GPU), show big on screen for volume & brightness, **language** (Auto, English or 한국어; changes right away and sticks), open at login |
+| Touch Bar | full width (cover the Control Strip), what to show next to Clawd (Claude usage, Mac stats, brightness & volume keys) |
+| Claude | connect or disconnect Claude Code, done sound (with preview, or off), calibrate limits, open claude.ai usage |
 
 ---
 
@@ -196,17 +203,17 @@ cd ~/Documents/ClawdPet && git pull && ./install.sh   # update (source install)
 cd ~/Documents/ClawdPet && ./uninstall.sh              # remove app + Claude Code hooks
 ```
 
-`uninstall.sh` quits the app, removes only Clawd's hooks from your Claude Code settings and deletes the app. If you installed from Releases, choose **Disconnect Claude Code** in the menu, then delete the app.
+`uninstall.sh` quits the app, removes only Clawd's hooks from your Claude Code settings and deletes the app. If you installed from Releases, choose **Settings… → Claude → Disconnect** in the menu, then delete the app.
 
 ## Troubleshooting
 
 | Problem | Fix |
 |---|---|
 | Clawd doesn't follow Claude | Start a **new** Claude Code session. Sessions that were already open use the old settings. |
-| No Clawd in the menu bar | Check that **Roam the menu bar** is on, and that your menu bar isn't set to auto-hide. |
+| No Clawd in the menu bar | Check that **Settings… → General → Also roam the menu bar** is on, and that your menu bar isn't set to auto-hide. |
 | Nothing on the Touch Bar | Choose **Show on Touch Bar** in the menu. You may have closed it with the ✕ on the left of the Touch Bar. |
-| The Done notice won't go away | That's on purpose. Click Clawd or the bubble, or use **Mark all done notices read**. |
-| No weekly % | Calibrate once: menu → **Claude usage** → **Calibrate…**. Using `claude` in a terminal also calibrates it automatically. |
+| The Done notice won't go away | That's on purpose. Click Clawd or the bubble, or use **Mark N done notices read** in the menu. |
+| No weekly % | Calibrate once: menu → **Usage & Mac stats…** → **Calibrate…**. Using `claude` in a terminal also calibrates it automatically. |
 | The % is a bit off from claude.ai | Usage from other devices or claude.ai chat isn't in this Mac's logs. Re-calibrate with **Calibrate…**. |
 
 ---
@@ -224,7 +231,7 @@ git tag v1.0.1 && git push origin v1.0.1                               # GitHub 
 ```
 
 - No Xcode project, just `swiftc` (Command Line Tools) and plain Swift + AppKit in `Sources/`.
-- The UI follows your Mac's language (English or Korean) unless you pick one under **언어 · Language** in the menu. `CLAWD_LANG=en` or `CLAWD_LANG=ko` forces one at launch, for screenshots.
+- The UI follows your Mac's language (English or Korean) unless you pick one in **Settings… → General → Language**. `CLAWD_LANG=en` or `CLAWD_LANG=ko` forces one at launch, for screenshots.
 - Clawd uses private macOS APIs (`DFRFoundation`, `DisplayServices`) to stay in the Touch Bar while other apps are in front, and to set built-in display brightness, like MTMR, Pock and MonitorControl do. That's fine for personal use, but it can't go on the App Store.
 - The hooks do nothing when the app isn't running, and never block Claude Code.
 

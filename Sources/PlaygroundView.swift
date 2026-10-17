@@ -13,8 +13,20 @@ enum Renderer {
 
         let px = world.px
         let smallPx = max(1, (px * 0.75 * scale).rounded() / scale)
+        if world.waterLevel != nil { drawWater(world, size: size, in: ctx, scale: scale, front: false) }
 
         for treat in world.treats {
+            switch treat.kind {
+            case .grass:
+                continue   // 풀은 동물 앞에 그린다
+            case .crumb:
+                PixelArt.drawCrumb(left: treat.grown, in: ctx, centerX: treat.x, bottom: treat.y, px: smallPx, scale: scale)
+                continue
+            case .flake:
+                continue   // 물고기밥은 수면 위에 (물 앞)
+            case .spark:
+                break
+            }
             let twinkle = Int(treat.age / 0.25) % 4 == 0
             PixelArt.draw(PixelArt.spark, size: (7, 7), in: ctx, centerX: treat.x, centerY: treat.y + 3.5 * smallPx,
                           px: smallPx, color: twinkle ? Palette.treatGlow : Palette.treat, scale: scale)
@@ -30,22 +42,37 @@ enum Renderer {
                 // 시끄러우면 덜덜 떤다
                 if holding.kind == .volume, holding.level > 0.8 { centerX += (Int(pet.time / 0.05) % 2 == 0 ? -0.5 : 0.5) * px }
             }
-            ClawdSprite.draw(frame, in: ctx, centerX: centerX, bottom: pet.y, px: px, scale: scale,
-                             color: Palette.clawd(heat: pet.heat))
+            // 헤엄치는 녀석은 물속에서 둥실둥실
+            let bottom = pet.y + world.swimLift(pet, sitting: frame.sitting)
+            world.species.draw(frame, in: ctx, centerX: centerX, bottom: bottom, px: px, scale: scale, heat: pet.heat, outline: world.transparent)
             if pet.mood == .furious, Int(pet.time / 0.4) % 2 == 0 {
                 // 머리 옆 💢
-                let top = pet.y + (frame.sitting ? px * 8 : world.spriteHeight)
-                PixelArt.draw(PixelArt.anger, size: (5, 5), in: ctx, centerX: centerX + px * 7, centerY: top - smallPx,
+                let top = bottom + (frame.sitting ? world.sittingHeight : world.spriteHeight)
+                PixelArt.draw(PixelArt.anger, size: (5, 5), in: ctx, centerX: centerX + world.species.headSide(facing: pet.facing) * world.spriteWidth * 0.39, centerY: top - smallPx,
                               px: smallPx, color: Palette.anger, scale: scale)
             }
             if let holding {
-                drawGaugeSign(holding, centerX: centerX, headTop: pet.y + world.spriteHeight, world: world, in: ctx, scale: scale)
-                if holding.kind == .volume { drawNoise(level: holding.level, centerX: centerX, bottom: pet.y, time: pet.time, world: world, in: ctx, scale: scale) }
+                drawGaugeSign(holding, centerX: centerX + world.species.signOffset(facing: pet.facing, px: px),
+                              headTop: world.species.signBottom(petBottom: bottom, petTop: bottom + world.spriteHeight, px: px),
+                              world: world, in: ctx, scale: scale)
+                if holding.kind == .volume { drawNoise(level: holding.level, centerX: centerX, bottom: bottom, time: pet.time, world: world, in: ctx, scale: scale) }
             } else if pet.showsClock {
-                let headTop = pet.y + (frame.sitting ? px * 8 : world.spriteHeight)
-                drawClockSign(centerX: centerX, headTop: headTop, world: world, in: ctx, scale: scale)
+                let headTop = world.species.signBottom(petBottom: bottom, petTop: bottom + (frame.sitting ? world.sittingHeight : world.spriteHeight), px: px)
+                drawClockSign(centerX: centerX + world.species.signOffset(facing: pet.facing, px: px), headTop: headTop, world: world, in: ctx, scale: scale)
             }
             if let thought = pet.thought { drawThought(thought, for: pet, world: world) }
+        }
+
+        // 물 표면은 물고기 앞에: 뛰어오를 때 물을 가르는 것처럼
+        if world.waterLevel != nil { drawWater(world, size: size, in: ctx, scale: scale, front: true) }
+        // 물고기밥은 수면 위에 둥둥
+        for treat in world.treats where treat.kind == .flake {
+            PixelArt.drawFlake(in: ctx, centerX: treat.x, bottom: treat.y - smallPx, px: smallPx, scale: scale)
+        }
+
+        // 양의 풀떼기: 뜯는 입이 풀에 묻혀 보이게 동물 앞에
+        for treat in world.treats where treat.kind == .grass {
+            PixelArt.drawGrass(grown: treat.grown, in: ctx, centerX: treat.x, bottom: treat.y, px: smallPx, scale: scale)
         }
 
         for p in world.particles {
@@ -109,6 +136,61 @@ enum Renderer {
         return f
     }
 
+    /// 출렁이는 강물. 뒤(front: false)엔 물 몸통·물살·자갈을, 앞(front: true)엔
+    /// 물속에 있는 것들을 물빛으로 살짝 덮고 반짝이는 수면 한 줄을 그린다 (물 밖으로 나온 부분만 또렷하게)
+    /// xOffset: 이 그림이 Touch Bar에서 놀이터보다 얼마나 오른쪽에 있는지 (밝기·소리 키 뒤 물결이 이어지게)
+    static func drawWater(_ world: Playground, size: CGSize, in ctx: CGContext, scale: CGFloat, front: Bool, xOffset: CGFloat = 0) {
+        let step = max(1, (world.px * 0.75 * scale).rounded() / scale)   // 물 픽셀 크기
+        func snap(_ v: CGFloat) -> CGFloat { ClawdSprite.snap((v / step).rounded() * step, scale) }
+        // 열마다 수면 높이
+        var columns: [(x: CGFloat, top: CGFloat)] = []
+        var x: CGFloat = 0
+        while x < size.width {
+            guard let surface = world.waterSurface(at: x + xOffset + step / 2) else { return }
+            columns.append((x, snap(surface)))
+            x += step
+        }
+        func fill(_ color: CGColor, _ rects: [CGRect]) {
+            ctx.setFillColor(color)
+            ctx.fill(rects)
+        }
+
+        if front {
+            fill(CGColor(srgbRed: 0.42, green: 0.78, blue: 1, alpha: 0.24), columns.map { CGRect(x: $0.x, y: 0, width: step, height: $0.top - step) })
+            fill(CGColor(srgbRed: 0.82, green: 0.95, blue: 1, alpha: 0.9), columns.map { CGRect(x: $0.x, y: $0.top - step, width: step, height: step) })
+            return
+        }
+
+        // 깊이별 띠: 바닥은 짙고 수면 쪽은 밝다
+        let bands: [(from: CGFloat, to: CGFloat, color: CGColor)] = [
+            (0, 0.35, CGColor(srgbRed: 0.13, green: 0.42, blue: 0.68, alpha: 1)),
+            (0.35, 0.7, CGColor(srgbRed: 0.19, green: 0.53, blue: 0.8, alpha: 1)),
+            (0.7, 1, CGColor(srgbRed: 0.26, green: 0.63, blue: 0.88, alpha: 1)),
+        ]
+        for band in bands {
+            fill(band.color, columns.map { col in
+                let lo = snap(col.top * band.from), hi = band.to >= 1 ? col.top - 2 * step : snap(col.top * band.to)
+                return CGRect(x: col.x, y: lo, width: step, height: max(0, hi - lo))
+            })
+        }
+        fill(CGColor(srgbRed: 0.5, green: 0.8, blue: 0.95, alpha: 1), columns.map { CGRect(x: $0.x, y: $0.top - 2 * step, width: step, height: step) })
+
+        // 물살: 하류(오른쪽)로 흘러가는 밝은 줄무늬. 누가 강을 거슬러 오를 땐 더 빠르고 진하게
+        let count = max(4, Int(size.width / 30))
+        var streaks: [CGRect] = []
+        for i in 0..<count {
+            let seed = CGFloat((i * 7919) % 997) / 997
+            let speed = 0.6 + seed * 0.8
+            let span = size.width + 40
+            let sx = (CGFloat(i) * 30 + seed * 60 + world.flow * speed + xOffset).truncatingRemainder(dividingBy: span) - 20
+            let surface = snap(world.waterSurface(at: sx + xOffset) ?? 0)
+            let rows = max(1, surface / step - 6)
+            let y = (2 + (seed * rows).rounded(.down)) * step
+            streaks.append(CGRect(x: snap(sx), y: y, width: CGFloat(3 + (i * 31) % 4) * step, height: step))
+        }
+        fill(CGColor(srgbRed: 0.66, green: 0.88, blue: 1, alpha: 0.18 + 0.45 * world.current), streaks)
+    }
+
     private static let speakerIcon = ClawdSprite.cells(["..#....", ".##.#..", "###..#.", ".##.#..", "..#...."])
     private static let mutedIcon = ClawdSprite.cells(["..#....", ".##.#.#", "###..#.", ".##.#.#", "..#...."])
     private static let sunIcon = ClawdSprite.cells(["#.#.#", ".###.", "#####", ".###.", "#.#.#"])
@@ -146,7 +228,7 @@ enum Renderer {
         guard count > 0 else { return }
         let sp = max(1, (world.px * 0.5 * scale).rounded() / scale)
         let wiggle = CGFloat(Int(time / 0.12) % 2) * sp
-        let midY = bottom + world.px * 6
+        let midY = bottom + world.spriteHeight * 0.6
         ctx.setFillColor(CGColor(gray: 0.85, alpha: 1))
         for i in 0..<count {
             let offset = world.spriteWidth / 2 + sp * 2 + CGFloat(i) * sp * 3 + wiggle
@@ -299,6 +381,8 @@ final class PlaygroundView: NSView {
             widthCap.constant = preferredWidth
         }
     }
+    /// 같은 아이템 안에서 옆 뷰(밝기·소리 버튼)가 차지하는 폭
+    var reservedWidth: CGFloat = 0
     private lazy var widthWish = widthAnchor.constraint(equalToConstant: preferredWidth)
     private lazy var widthCap = widthAnchor.constraint(lessThanOrEqualToConstant: preferredWidth)
     /// Touch Bar에 붙었다/떨어졌다를 알려준다 (닫기 버튼으로 내려간 경우 포함)
@@ -342,7 +426,7 @@ final class PlaygroundView: NSView {
         var ancestor = superview
         while let view = ancestor, String(describing: type(of: view)) != "NSTouchBarView" { ancestor = view.superview }
         guard let barView = ancestor else { return }
-        let available = barView.bounds.width.rounded(.down)
+        let available = (barView.bounds.width - reservedWidth).rounded(.down)
         if available >= 160 && widthCap.constant > available {
             widthCap.constant = available
             widthWish.constant = available
@@ -481,5 +565,115 @@ final class PlaygroundView: NSView {
         } else {
             super.rightMouseDown(with: event)
         }
+    }
+}
+
+/// Touch Bar의 밝기·소리 버튼 다섯 개를 한 줄로
+final class ControlPad: NSView {
+    static let gap: CGFloat = 8
+    static func width(buttonWidth: CGFloat, count: Int) -> CGFloat { buttonWidth * CGFloat(count) + gap * CGFloat(count - 1) }
+
+    init(buttons: [NSButton], buttonWidth: CGFloat) {
+        super.init(frame: .zero)
+        translatesAutoresizingMaskIntoConstraints = false
+        var previous: NSView?
+        for button in buttons {
+            button.translatesAutoresizingMaskIntoConstraints = false
+            addSubview(button)
+            NSLayoutConstraint.activate([
+                button.widthAnchor.constraint(equalToConstant: buttonWidth),
+                button.centerYAnchor.constraint(equalTo: centerYAnchor),
+                previous.map { button.leadingAnchor.constraint(equalTo: $0.trailingAnchor, constant: Self.gap) }
+                    ?? button.leadingAnchor.constraint(equalTo: leadingAnchor),
+            ])
+            previous = button
+        }
+        widthAnchor.constraint(equalToConstant: Self.width(buttonWidth: buttonWidth, count: buttons.count)).isActive = true
+        heightAnchor.constraint(equalToConstant: 30).isActive = true
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+}
+
+/// Touch Bar의 놀이터 아이템. 놀이터 바로 옆에 밝기·소리 버튼이 올 땐 한 아이템에 붙인다
+/// (아이템 사이 빈틈이 없어서, 헤엄치는 캐릭터의 강물이 버튼 뒤까지 끊기지 않고 이어진다)
+final class BarContainer: NSView {
+    private let playground: PlaygroundView
+    private var pad: NSView?
+    private var layoutConstraints: [NSLayoutConstraint] = []
+    private var timer: Timer?
+
+    init(playground: PlaygroundView) {
+        self.playground = playground
+        super.init(frame: NSRect(x: 0, y: 0, width: 685, height: 30))
+        addSubview(playground)
+        setPad(nil)
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+
+    override var intrinsicContentSize: NSSize { NSSize(width: NSView.noIntrinsicMetric, height: 30) }
+
+    /// 버튼을 붙이거나 뗀다 (Touch Bar에 다시 올리기 전에)
+    func setPad(_ newPad: NSView?) {
+        NSLayoutConstraint.deactivate(layoutConstraints)
+        if pad !== newPad { pad?.removeFromSuperview() }
+        pad = newPad
+        var constraints = [
+            playground.leadingAnchor.constraint(equalTo: leadingAnchor),
+            playground.topAnchor.constraint(equalTo: topAnchor),
+            playground.bottomAnchor.constraint(equalTo: bottomAnchor),
+        ]
+        if let newPad {
+            if newPad.superview !== self { newPad.removeFromSuperview(); addSubview(newPad) }
+            constraints += [
+                newPad.leadingAnchor.constraint(equalTo: playground.trailingAnchor, constant: ControlPad.gap),
+                newPad.trailingAnchor.constraint(equalTo: trailingAnchor),
+                newPad.centerYAnchor.constraint(equalTo: centerYAnchor),
+            ]
+            playground.reservedWidth = newPad.fittingSize.width + ControlPad.gap
+        } else {
+            constraints.append(playground.trailingAnchor.constraint(equalTo: trailingAnchor))
+            playground.reservedWidth = 0
+        }
+        layoutConstraints = constraints
+        NSLayoutConstraint.activate(constraints)
+        needsDisplay = true
+        updateTimer()
+    }
+
+    private var hasWater: Bool { pad != nil && playground.world.waterLevel != nil }
+
+    /// 캐릭터가 바뀌면 물을 켜고 끈다
+    func refresh() {
+        needsDisplay = true
+        updateTimer()
+    }
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        updateTimer()
+    }
+
+    private func updateTimer() {
+        let animate = hasWater && window != nil
+        if animate, timer == nil {
+            let timer = Timer(timeInterval: 1.0 / 30, repeats: true) { [weak self] _ in self?.needsDisplay = true }
+            RunLoop.main.add(timer, forMode: .common)
+            self.timer = timer
+        } else if !animate {
+            timer?.invalidate()
+            timer = nil
+        }
+    }
+
+    /// 놀이터 오른쪽 틈과 버튼 뒤에 같은 강물을 그린다 (놀이터와 같은 x 좌표라 물결이 그대로 이어진다)
+    override func draw(_ dirtyRect: NSRect) {
+        guard hasWater, let ctx = NSGraphicsContext.current?.cgContext else { return }
+        let scale = window?.backingScaleFactor ?? 2
+        ctx.setFillColor(CGColor(gray: 0, alpha: 1))
+        ctx.fill(bounds)
+        Renderer.drawWater(playground.world, size: bounds.size, in: ctx, scale: scale, front: false)
+        Renderer.drawWater(playground.world, size: bounds.size, in: ctx, scale: scale, front: true)
     }
 }
